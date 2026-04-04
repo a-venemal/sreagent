@@ -32,7 +32,7 @@ RUN npm run build
 # ========== Final runtime stage ==========
 FROM alpine:3.20
 
-RUN apk add --no-cache ca-certificates tzdata curl bash mysql-client \
+RUN apk add --no-cache ca-certificates tzdata bash mysql-client \
     && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone
 
@@ -51,8 +51,5 @@ RUN mkdir -p logs \
     && chmod +x ./sreagent ./entrypoint.sh
 
 EXPOSE 8080
-
-HEALTHCHECK --interval=15s --timeout=3s --start-period=15s \
-  CMD curl -f http://localhost:8080/healthz || exit 1
 
 ENTRYPOINT ["./entrypoint.sh"]
