@@ -1,0 +1,89 @@
+package model
+
+import "time"
+
+// AlertEventStatus defines the lifecycle status of an alert event.
+type AlertEventStatus string
+
+const (
+	EventStatusFiring       AlertEventStatus = "firing"
+	EventStatusAcknowledged AlertEventStatus = "acknowledged"
+	EventStatusAssigned     AlertEventStatus = "assigned"
+	EventStatusSilenced     AlertEventStatus = "silenced"
+	EventStatusResolved     AlertEventStatus = "resolved"
+	EventStatusClosed       AlertEventStatus = "closed"
+)
+
+// AlertEvent represents an instance of an alert firing.
+type AlertEvent struct {
+	BaseModel
+	// Fingerprint for deduplication (hash of labels + rule)
+	Fingerprint string           `json:"fingerprint" gorm:"size:64;uniqueIndex;not null"`
+	RuleID      *uint            `json:"rule_id" gorm:"index"`
+	Rule        *AlertRule       `json:"rule,omitempty" gorm:"foreignKey:RuleID"`
+	AlertName   string           `json:"alert_name" gorm:"size:256;not null;index"`
+	Severity    AlertSeverity    `json:"severity" gorm:"size:32;not null;index"`
+	Status      AlertEventStatus `json:"status" gorm:"size:32;not null;index;default:firing"`
+	Labels      JSONLabels       `json:"labels" gorm:"type:json"`
+	Annotations JSONLabels       `json:"annotations" gorm:"type:json"`
+	// Source information
+	Source       string `json:"source" gorm:"size:128"` // datasource name or external
+	GeneratorURL string `json:"generator_url" gorm:"size:512"`
+	// Timestamps
+	FiredAt    time.Time  `json:"fired_at" gorm:"not null;index"`
+	AckedAt    *time.Time `json:"acked_at"`
+	ResolvedAt *time.Time `json:"resolved_at"`
+	ClosedAt   *time.Time `json:"closed_at"`
+	// Assignment
+	AckedBy      *uint `json:"acked_by" gorm:"index"`
+	AckedByUser  *User `json:"acked_by_user,omitempty" gorm:"foreignKey:AckedBy"`
+	AssignedTo   *uint `json:"assigned_to" gorm:"index"`
+	AssignedUser *User `json:"assigned_to_user,omitempty" gorm:"foreignKey:AssignedTo"`
+	// Silence
+	SilencedUntil *time.Time `json:"silenced_until" gorm:"index"`
+	SilenceReason string     `json:"silence_reason" gorm:"size:512"`
+	// Resolution
+	Resolution string `json:"resolution" gorm:"type:text"`
+	// Count of occurrences (for dedup grouping)
+	FireCount int `json:"fire_count" gorm:"default:1"`
+	// OnCall dispatch fields
+	OnCallUserID *uint `json:"oncall_user_id" gorm:"index"`        // user assigned via on-call
+	IsDispatched bool  `json:"is_dispatched" gorm:"default:false"` // whether an on-call assignment was made
+}
+
+func (AlertEvent) TableName() string {
+	return "alert_events"
+}
+
+// AlertTimelineAction defines actions tracked in the timeline.
+type AlertTimelineAction string
+
+const (
+	TimelineActionCreated      AlertTimelineAction = "created"
+	TimelineActionAcknowledged AlertTimelineAction = "acknowledged"
+	TimelineActionAssigned     AlertTimelineAction = "assigned"
+	TimelineActionCommented    AlertTimelineAction = "commented"
+	TimelineActionEscalated    AlertTimelineAction = "escalated"
+	TimelineActionResolved     AlertTimelineAction = "resolved"
+	TimelineActionClosed       AlertTimelineAction = "closed"
+	TimelineActionReopened     AlertTimelineAction = "reopened"
+	TimelineActionNotified     AlertTimelineAction = "notified"
+	TimelineActionSilenced     AlertTimelineAction = "silenced"
+	TimelineActionUnsilenced   AlertTimelineAction = "unsilenced"
+	TimelineActionDispatched   AlertTimelineAction = "dispatched" // auto-assigned via on-call
+)
+
+// AlertTimeline records the lifecycle events of an alert.
+type AlertTimeline struct {
+	BaseModel
+	EventID    uint                `json:"event_id" gorm:"index;not null"`
+	Action     AlertTimelineAction `json:"action" gorm:"size:32;not null"`
+	OperatorID *uint               `json:"operator_id" gorm:"index"`
+	Operator   *User               `json:"operator,omitempty" gorm:"foreignKey:OperatorID"`
+	Note       string              `json:"note" gorm:"type:text"`
+	Extra      string              `json:"extra" gorm:"type:json"` // additional context as JSON
+}
+
+func (AlertTimeline) TableName() string {
+	return "alert_timelines"
+}

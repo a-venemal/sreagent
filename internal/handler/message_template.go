@@ -1,0 +1,165 @@
+package handler
+
+import (
+	"github.com/gin-gonic/gin"
+
+	"github.com/sreagent/sreagent/internal/model"
+	"github.com/sreagent/sreagent/internal/service"
+)
+
+// MessageTemplateHandler handles HTTP requests for message templates.
+type MessageTemplateHandler struct {
+	svc *service.MessageTemplateService
+}
+
+// NewMessageTemplateHandler creates a new MessageTemplateHandler.
+func NewMessageTemplateHandler(svc *service.MessageTemplateService) *MessageTemplateHandler {
+	return &MessageTemplateHandler{svc: svc}
+}
+
+// CreateMessageTemplateRequest is the request body for creating a message template.
+type CreateMessageTemplateRequest struct {
+	Name        string `json:"name" binding:"required"`
+	Description string `json:"description"`
+	Content     string `json:"content" binding:"required"`
+	Type        string `json:"type"` // text, html, markdown, lark_card
+}
+
+// UpdateMessageTemplateRequest is the request body for updating a message template.
+type UpdateMessageTemplateRequest struct {
+	Name        string `json:"name" binding:"required"`
+	Description string `json:"description"`
+	Content     string `json:"content" binding:"required"`
+	Type        string `json:"type"`
+}
+
+// PreviewMessageTemplateRequest is the request body for previewing a template rendering.
+type PreviewMessageTemplateRequest struct {
+	Content string `json:"content" binding:"required"`
+}
+
+// Create creates a new message template.
+func (h *MessageTemplateHandler) Create(c *gin.Context) {
+	var req CreateMessageTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorWithMessage(c, 10001, err.Error())
+		return
+	}
+
+	tmplType := req.Type
+	if tmplType == "" {
+		tmplType = "text"
+	}
+
+	tmpl := &model.MessageTemplate{
+		Name:        req.Name,
+		Description: req.Description,
+		Content:     req.Content,
+		Type:        tmplType,
+	}
+
+	if err := h.svc.Create(c.Request.Context(), tmpl); err != nil {
+		Error(c, err)
+		return
+	}
+
+	Success(c, tmpl)
+}
+
+// Get returns a single message template by ID.
+func (h *MessageTemplateHandler) Get(c *gin.Context) {
+	id, err := GetIDParam(c, "id")
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	tmpl, err := h.svc.GetByID(c.Request.Context(), id)
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	Success(c, tmpl)
+}
+
+// List returns a paginated list of message templates.
+func (h *MessageTemplateHandler) List(c *gin.Context) {
+	pq := GetPageQuery(c)
+
+	list, total, err := h.svc.List(c.Request.Context(), pq.Page, pq.PageSize)
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	SuccessPage(c, list, total, pq.Page, pq.PageSize)
+}
+
+// Update updates a message template.
+func (h *MessageTemplateHandler) Update(c *gin.Context) {
+	id, err := GetIDParam(c, "id")
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	var req UpdateMessageTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorWithMessage(c, 10001, err.Error())
+		return
+	}
+
+	tmplType := req.Type
+	if tmplType == "" {
+		tmplType = "text"
+	}
+
+	tmpl := &model.MessageTemplate{
+		Name:        req.Name,
+		Description: req.Description,
+		Content:     req.Content,
+		Type:        tmplType,
+	}
+	tmpl.ID = id
+
+	if err := h.svc.Update(c.Request.Context(), tmpl); err != nil {
+		Error(c, err)
+		return
+	}
+
+	Success(c, tmpl)
+}
+
+// Delete deletes a message template.
+func (h *MessageTemplateHandler) Delete(c *gin.Context) {
+	id, err := GetIDParam(c, "id")
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	if err := h.svc.Delete(c.Request.Context(), id); err != nil {
+		Error(c, err)
+		return
+	}
+
+	Success(c, nil)
+}
+
+// Preview renders a template with sample data and returns the result.
+func (h *MessageTemplateHandler) Preview(c *gin.Context) {
+	var req PreviewMessageTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorWithMessage(c, 10001, err.Error())
+		return
+	}
+
+	rendered, err := h.svc.RenderPreview(c.Request.Context(), req.Content)
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	Success(c, gin.H{"rendered": rendered})
+}

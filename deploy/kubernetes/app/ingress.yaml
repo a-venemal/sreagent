@@ -1,0 +1,47 @@
+# =============================================================================
+# SREAgent Ingress（使用 nginx ingress controller）
+#
+# 前提条件：
+#   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+#
+# TLS 证书使用 cert-manager 自动申请（Let's Encrypt）：
+#   kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+#
+# 修改 host 为你的实际域名
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sreagent
+  namespace: sreagent
+  labels:
+    app: sreagent
+  annotations:
+    # nginx ingress
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    # WebSocket 支持（如有需要）
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+    # cert-manager 自动 TLS（如已安装）
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - sreagent.example.com   # 替换为你的域名
+      secretName: sreagent-tls
+  rules:
+    - host: sreagent.example.com  # 替换为你的域名
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sreagent
+                port:
+                  number: 80

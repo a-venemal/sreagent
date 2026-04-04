@@ -1,0 +1,33 @@
+# =============================================================================
+# SREAgent HorizontalPodAutoscaler（水平自动扩缩容）
+#
+# 前提：集群需安装 metrics-server
+#   kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+#
+# 注意：若告警引擎不支持分布式锁，minReplicas 应保持为 1
+# =============================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: sreagent
+  namespace: sreagent
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: sreagent
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

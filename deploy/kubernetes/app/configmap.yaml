@@ -1,0 +1,53 @@
+# =============================================================================
+# SREAgent 应用 ConfigMap — 非敏感启动配置
+# AI 和 Lark Bot 配置已移至数据库，不再出现在此文件中
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sreagent-config
+  namespace: sreagent
+  labels:
+    app: sreagent
+data:
+  config.yaml: |
+    server:
+      host: "0.0.0.0"
+      port: 8080
+      mode: "release"
+      # 修改为你的实际外部访问地址（用于通知消息中的链接）
+      external_base: "https://sreagent.example.com"
+
+    database:
+      driver: mysql
+      host: mysql-svc       # K8s Service 名称
+      port: 3306
+      username: sreagent
+      # password 由环境变量 SREAGENT_DATABASE_PASSWORD 覆盖
+      database: sreagent
+      charset: utf8mb4
+      max_idle_conns: 10
+      max_open_conns: 100
+      max_lifetime: 3600
+
+    redis:
+      host: redis           # K8s Service 名称
+      port: 6379
+      # password 由环境变量 SREAGENT_REDIS_PASSWORD 覆盖
+      db: 0
+      pool_size: 20
+
+    jwt:
+      # secret 由环境变量 SREAGENT_JWT_SECRET 覆盖
+      expire: 86400
+      issuer: sreagent
+
+    log:
+      level: "info"
+      format: "json"        # K8s 日志收集推荐 JSON 格式
+
+    engine:
+      enabled: true
+      sync_interval: 30
+
+    # AI 和 Lark Bot 配置通过 Web UI → Settings 页面配置，存储在数据库中

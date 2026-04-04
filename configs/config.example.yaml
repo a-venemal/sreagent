@@ -1,0 +1,57 @@
+# SREAgent Platform Configuration
+# ============================================================
+# This file contains ONLY the settings required to start the
+# server process.  All other platform settings (AI provider,
+# Lark Bot credentials, etc.) are stored in the database and
+# can be configured via the Web UI → Settings page.
+#
+# Copy this file to config.yaml and fill in the values.
+# Sensitive values can also be set via environment variables
+# (prefix SREAGENT_, e.g. SREAGENT_DATABASE_PASSWORD).
+# ============================================================
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  mode: "debug"
+  # Public URL used in notification links (optional, falls back to host:port)
+  # external_base: "https://sreagent.example.com"
+
+database:
+  driver: "mysql"
+  host: "127.0.0.1"
+  port: 3306
+  username: "sreagent"
+  password: "change-me"          # override via SREAGENT_DATABASE_PASSWORD
+  database: "sreagent"
+  charset: "utf8mb4"
+  max_idle_conns: 10
+  max_open_conns: 100
+  max_lifetime: 3600
+
+redis:
+  host: "127.0.0.1"
+  port: 6379
+  password: ""                   # override via SREAGENT_REDIS_PASSWORD
+  db: 0
+  pool_size: 100
+
+jwt:
+  secret: "change-me-in-production-please"   # override via SREAGENT_JWT_SECRET
+  expire: 86400
+  issuer: "sreagent"
+
+log:
+  level: "info"
+  format: "json"
+  output: "stdout"
+  file: "logs/sreagent.log"
+
+engine:
+  enabled: true
+  sync_interval: 30     # how often to sync alert rules from DB (seconds)
+
+# ============================================================
+# AI and Lark Bot settings are NOT stored here.
+# Configure them at runtime via: Settings → AI Config / Lark Bot
+# ============================================================

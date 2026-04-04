@@ -1,0 +1,112 @@
+package repository
+
+import (
+	"context"
+
+	"gorm.io/gorm"
+
+	"github.com/sreagent/sreagent/internal/model"
+)
+
+// TeamRepository handles teams and team_members persistence.
+type TeamRepository struct {
+	db *gorm.DB
+}
+
+func NewTeamRepository(db *gorm.DB) *TeamRepository {
+	return &TeamRepository{db: db}
+}
+
+func (r *TeamRepository) Create(ctx context.Context, team *model.Team) error {
+	return r.db.WithContext(ctx).Create(team).Error
+}
+
+func (r *TeamRepository) GetByID(ctx context.Context, id uint) (*model.Team, error) {
+	var team model.Team
+	err := r.db.WithContext(ctx).First(&team, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &team, nil
+}
+
+func (r *TeamRepository) List(ctx context.Context, page, pageSize int) ([]model.Team, int64, error) {
+	var list []model.Team
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&model.Team{})
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * pageSize
+	if err := query.Offset(offset).Limit(pageSize).Order("id DESC").Find(&list).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return list, total, nil
+}
+
+func (r *TeamRepository) Update(ctx context.Context, team *model.Team) error {
+	return r.db.WithContext(ctx).Save(team).Error
+}
+
+func (r *TeamRepository) Delete(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Remove all team members first
+		if err := tx.WithContext(ctx).Where("team_id = ?", id).Delete(&model.TeamMember{}).Error; err != nil {
+			return err
+		}
+		// Delete the team
+		return tx.WithContext(ctx).Delete(&model.Team{}, id).Error
+	})
+}
+
+// AddMember adds a user to a team with the specified role.
+func (r *TeamRepository) AddMember(ctx context.Context, teamID, userID uint, role string) error {
+	member := &model.TeamMember{
+		TeamID: teamID,
+		UserID: userID,
+		Role:   role,
+	}
+	// Use FirstOrCreate to avoid duplicate key errors, then update role if needed
+	result := r.db.WithContext(ctx).
+		Where("team_id = ? AND user_id = ?", teamID, userID).
+		Assign(model.TeamMember{Role: role}).
+		FirstOrCreate(member)
+	return result.Error
+}
+
+// RemoveMember removes a user from a team.
+func (r *TeamRepository) RemoveMember(ctx context.Context, teamID, userID uint) error {
+	return r.db.WithContext(ctx).
+		Where("team_id = ? AND user_id = ?", teamID, userID).
+		Delete(&model.TeamMember{}).Error
+}
+
+// ListMembers returns all members of a team with their user info.
+func (r *TeamRepository) ListMembers(ctx context.Context, teamID uint) ([]model.TeamMember, error) {
+	var members []model.TeamMember
+	err := r.db.WithContext(ctx).
+		Where("team_id = ?", teamID).
+		Find(&members).Error
+	return members, err
+}
+
+// GetByLabels finds teams whose labels are a subset match of the provided labels.
+func (r *TeamRepository) GetByLabels(ctx context.Context, labels map[string]string) ([]model.Team, error) {
+	var allTeams []model.Team
+	err := r.db.WithContext(ctx).Find(&allTeams).Error
+	if err != nil {
+		return nil, err
+	}
+
+	var matched []model.Team
+	for _, team := range allTeams {
+		if labelsMatch(team.Labels, labels) {
+			matched = append(matched, team)
+		}
+	}
+	return matched, nil
+}

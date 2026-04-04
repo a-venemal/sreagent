@@ -1,0 +1,225 @@
+package service
+
+import (
+	"context"
+
+	"go.uber.org/zap"
+
+	"github.com/sreagent/sreagent/internal/model"
+	apperr "github.com/sreagent/sreagent/internal/pkg/errors"
+	"github.com/sreagent/sreagent/internal/repository"
+)
+
+// BizGroupService provides CRUD and tree operations for business groups.
+type BizGroupService struct {
+	repo   *repository.BizGroupRepository
+	logger *zap.Logger
+}
+
+// NewBizGroupService creates a new BizGroupService.
+func NewBizGroupService(
+	repo *repository.BizGroupRepository,
+	logger *zap.Logger,
+) *BizGroupService {
+	return &BizGroupService{
+		repo:   repo,
+		logger: logger,
+	}
+}
+
+// Create creates a new business group.
+func (s *BizGroupService) Create(ctx context.Context, group *model.BizGroup) error {
+	// Validate parent exists if specified
+	if group.ParentID != nil {
+		if _, err := s.repo.GetByID(ctx, *group.ParentID); err != nil {
+			return apperr.WithMessage(apperr.ErrBizGroupNotFound, "parent group not found")
+		}
+	}
+
+	if err := s.repo.Create(ctx, group); err != nil {
+		s.logger.Error("failed to create biz group", zap.Error(err))
+		return apperr.Wrap(apperr.ErrDatabase, err)
+	}
+	return nil
+}
+
+// GetByID returns a business group by its ID.
+func (s *BizGroupService) GetByID(ctx context.Context, id uint) (*model.BizGroup, error) {
+	group, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, apperr.ErrBizGroupNotFound
+	}
+	return group, nil
+}
+
+// List returns a paginated list of business groups.
+func (s *BizGroupService) List(ctx context.Context, page, pageSize int) ([]model.BizGroup, int64, error) {
+	list, total, err := s.repo.List(ctx, page, pageSize)
+	if err != nil {
+		s.logger.Error("failed to list biz groups", zap.Error(err))
+		return nil, 0, apperr.Wrap(apperr.ErrDatabase, err)
+	}
+	return list, total, nil
+}
+
+// BizGroupTreeNode represents a node in the business group tree.
+type BizGroupTreeNode struct {
+	model.BizGroup
+	Children []*BizGroupTreeNode `json:"children,omitempty"`
+}
+
+// ListTree returns all business groups organized as a tree.
+func (s *BizGroupService) ListTree(ctx context.Context) ([]*BizGroupTreeNode, error) {
+	groups, err := s.repo.ListTree(ctx)
+	if err != nil {
+		s.logger.Error("failed to list biz groups for tree", zap.Error(err))
+		return nil, apperr.Wrap(apperr.ErrDatabase, err)
+	}
+
+	// Build tree structure
+	nodeMap := make(map[uint]*BizGroupTreeNode)
+	var roots []*BizGroupTreeNode
+
+	// First pass: create all nodes
+	for _, g := range groups {
+		node := &BizGroupTreeNode{BizGroup: g}
+		nodeMap[g.ID] = node
+	}
+
+	// Second pass: build parent-child relationships
+	for _, g := range groups {
+		node := nodeMap[g.ID]
+		if g.ParentID != nil {
+			if parent, ok := nodeMap[*g.ParentID]; ok {
+				parent.Children = append(parent.Children, node)
+			} else {
+				// Parent not found, treat as root
+				roots = append(roots, node)
+			}
+		} else {
+			roots = append(roots, node)
+		}
+	}
+
+	return roots, nil
+}
+
+// Update updates an existing business group.
+func (s *BizGroupService) Update(ctx context.Context, group *model.BizGroup) error {
+	existing, err := s.repo.GetByID(ctx, group.ID)
+	if err != nil {
+		return apperr.ErrBizGroupNotFound
+	}
+
+	// Validate parent exists if changed
+	if group.ParentID != nil {
+		// Prevent setting self as parent
+		if *group.ParentID == group.ID {
+			return apperr.WithMessage(apperr.ErrBadRequest, "cannot set group as its own parent")
+		}
+		if _, err := s.repo.GetByID(ctx, *group.ParentID); err != nil {
+			return apperr.WithMessage(apperr.ErrBizGroupNotFound, "parent group not found")
+		}
+	}
+
+	existing.Name = group.Name
+	existing.Description = group.Description
+	existing.ParentID = group.ParentID
+	existing.Labels = group.Labels
+
+	if err := s.repo.Update(ctx, existing); err != nil {
+		s.logger.Error("failed to update biz group", zap.Error(err))
+		return apperr.Wrap(apperr.ErrDatabase, err)
+	}
+	return nil
+}
+
+// Delete deletes a business group by ID.
+func (s *BizGroupService) Delete(ctx context.Context, id uint) error {
+	if _, err := s.repo.GetByID(ctx, id); err != nil {
+		return apperr.ErrBizGroupNotFound
+	}
+
+	if err := s.repo.Delete(ctx, id); err != nil {
+		s.logger.Error("failed to delete biz group", zap.Error(err))
+		return apperr.Wrap(apperr.ErrDatabase, err)
+	}
+	return nil
+}
+
+// AddMember adds a user to a business group with the specified role.
+func (s *BizGroupService) AddMember(ctx context.Context, groupID, userID uint, role string) error {
+	if _, err := s.repo.GetByID(ctx, groupID); err != nil {
+		return apperr.ErrBizGroupNotFound
+	}
+
+	if role == "" {
+		role = "member"
+	}
+
+	// Check if user is already a member
+	existing, _ := s.repo.GetMember(ctx, groupID, userID)
+	if existing != nil {
+		return apperr.WithMessage(apperr.ErrConflict, "user is already a member of this group")
+	}
+
+	if err := s.repo.AddMember(ctx, groupID, userID, role); err != nil {
+		s.logger.Error("failed to add biz group member",
+			zap.Uint("group_id", groupID),
+			zap.Uint("user_id", userID),
+			zap.Error(err),
+		)
+		return apperr.Wrap(apperr.ErrDatabase, err)
+	}
+
+	s.logger.Info("biz group member added",
+		zap.Uint("group_id", groupID),
+		zap.Uint("user_id", userID),
+		zap.String("role", role),
+	)
+	return nil
+}
+
+// RemoveMember removes a user from a business group.
+func (s *BizGroupService) RemoveMember(ctx context.Context, groupID, userID uint) error {
+	if _, err := s.repo.GetByID(ctx, groupID); err != nil {
+		return apperr.ErrBizGroupNotFound
+	}
+
+	if _, err := s.repo.GetMember(ctx, groupID, userID); err != nil {
+		return apperr.WithMessage(apperr.ErrNotFound, "user is not a member of this group")
+	}
+
+	if err := s.repo.RemoveMember(ctx, groupID, userID); err != nil {
+		s.logger.Error("failed to remove biz group member",
+			zap.Uint("group_id", groupID),
+			zap.Uint("user_id", userID),
+			zap.Error(err),
+		)
+		return apperr.Wrap(apperr.ErrDatabase, err)
+	}
+
+	s.logger.Info("biz group member removed",
+		zap.Uint("group_id", groupID),
+		zap.Uint("user_id", userID),
+	)
+	return nil
+}
+
+// ListMembers returns all members of a business group.
+func (s *BizGroupService) ListMembers(ctx context.Context, groupID uint) ([]model.BizGroupMember, error) {
+	if _, err := s.repo.GetByID(ctx, groupID); err != nil {
+		return nil, apperr.ErrBizGroupNotFound
+	}
+
+	members, err := s.repo.ListMembers(ctx, groupID)
+	if err != nil {
+		s.logger.Error("failed to list biz group members",
+			zap.Uint("group_id", groupID),
+			zap.Error(err),
+		)
+		return nil, apperr.Wrap(apperr.ErrDatabase, err)
+	}
+
+	return members, nil
+}

@@ -1,0 +1,80 @@
+/* SREAgent Global Styles */
+
+/* ===== CSS Variables ===== */
+:root {
+  --sre-primary:        #18a058;
+  --sre-primary-hover:  #36ad6a;
+  --sre-danger:         #e88080;
+  --sre-warning:        #f2c97d;
+  --sre-info:           #70c0e8;
+  --sre-bg-page:        #101014;
+  --sre-bg-card:        #18181c;
+  --sre-border:         rgba(255, 255, 255, 0.06);
+  --sre-text-primary:   rgba(255, 255, 255, 0.9);
+  --sre-text-secondary: rgba(255, 255, 255, 0.45);
+  --sre-text-tertiary:  rgba(255, 255, 255, 0.3);
+}
+
+body.light-theme {
+  --sre-bg-page:        #f5f5f5;
+  --sre-bg-card:        #ffffff;
+  --sre-border:         #e8e8e8;
+  --sre-text-primary:   rgba(0, 0, 0, 0.85);
+  --sre-text-secondary: rgba(0, 0, 0, 0.45);
+  --sre-text-tertiary:  rgba(0, 0, 0, 0.25);
+}
+
+/* ===== Base ===== */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--sre-bg-page);
+  color: var(--sre-text-primary);
+  overflow-x: hidden;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #666; }
+body.light-theme ::-webkit-scrollbar-thumb { background: #ccc; }
+body.light-theme ::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
+/* ===== Utilities ===== */
+.gradient-text {
+  background: linear-gradient(135deg, #18a058, #70c0e8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Page-level title - used by all pages */
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: var(--sre-text-primary);
+}
+
+/* Severity colors */
+.severity-critical { color: var(--sre-danger); }
+.severity-warning  { color: var(--sre-warning); }
+.severity-info     { color: var(--sre-info); }
+
+/* Pulse animation */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+.pulse { animation: pulse-dot 2s ease-in-out infinite; }
+
+/* Card hover */
+.card-hover { transition: all 0.3s ease; }
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}

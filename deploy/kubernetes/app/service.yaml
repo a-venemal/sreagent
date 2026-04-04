@@ -1,0 +1,19 @@
+# =============================================================================
+# SREAgent Service
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: sreagent
+  namespace: sreagent
+  labels:
+    app: sreagent
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+  selector:
+    app: sreagent
