@@ -4,9 +4,6 @@
 -- 所有表使用 utf8mb4_unicode_ci，软删除字段 deleted_at，JSON 列用 json 类型
 -- =============================================================================
 
-SET NAMES utf8mb4;
-SET FOREIGN_KEY_CHECKS = 0;
-
 -- -----------------------------------------------------------------------------
 -- users
 -- -----------------------------------------------------------------------------
@@ -560,5 +557,3 @@ CREATE TABLE IF NOT EXISTS `user_notify_configs` (
   UNIQUE KEY `udx_user_media`              (`user_id`, `media_type`),
   KEY            `idx_user_notify_configs_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-SET FOREIGN_KEY_CHECKS = 1;
