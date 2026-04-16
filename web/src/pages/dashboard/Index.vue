@@ -109,9 +109,9 @@ const severityChartOption = computed(() => ({
       itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.4)' },
     },
     data: [
-      { value: stats.value.severity_breakdown?.critical ?? 0, name: 'Critical', itemStyle: { color: '#e88080' } },
-      { value: stats.value.severity_breakdown?.warning ?? 0, name: 'Warning', itemStyle: { color: '#f2c97d' } },
-      { value: stats.value.severity_breakdown?.info ?? 0, name: 'Info', itemStyle: { color: '#70c0e8' } },
+      { value: stats.value.severity_breakdown?.critical ?? 0, name: t('alert.critical'), itemStyle: { color: '#e88080' } },
+      { value: stats.value.severity_breakdown?.warning ?? 0, name: t('alert.warning'), itemStyle: { color: '#f2c97d' } },
+      { value: stats.value.severity_breakdown?.info ?? 0, name: t('alert.info'), itemStyle: { color: '#70c0e8' } },
     ],
   }],
 }))
@@ -309,7 +309,7 @@ onMounted(() => {
                     {{ engineStatus.running ? t('engine.running') : t('engine.stopped') }}
                   </span>
                 </div>
-                <div class="engine-meta">{{ engineStatus.total_rules }} rules · {{ engineStatus.active_alerts }} active</div>
+                <div class="engine-meta">{{ engineStatus.total_rules }} {{ t('engine.rulesUnit') }} · {{ engineStatus.active_alerts }} {{ t('engine.activeUnit') }}</div>
               </div>
             </div>
           </div>
@@ -324,7 +324,7 @@ onMounted(() => {
       <n-gi :span="4">
         <div class="panel-card">
           <div class="panel-card__header">
-            <span class="panel-card__title">Active Alert Distribution</span>
+            <span class="panel-card__title">{{ t('dashboard.severityDistribution') }}</span>
           </div>
           <div class="chart-donut-wrap">
             <v-chart :option="severityChartOption" autoresize style="height:180px" />
@@ -332,17 +332,17 @@ onMounted(() => {
           <div class="sev-legend">
             <div class="sev-item">
               <span class="sev-dot sev-dot--critical" />
-              <span class="sev-label">Critical</span>
+              <span class="sev-label">{{ t('alert.critical') }}</span>
               <span class="sev-count">{{ stats.severity_breakdown?.critical ?? 0 }}</span>
             </div>
             <div class="sev-item">
               <span class="sev-dot sev-dot--warning" />
-              <span class="sev-label">Warning</span>
+              <span class="sev-label">{{ t('alert.warning') }}</span>
               <span class="sev-count">{{ stats.severity_breakdown?.warning ?? 0 }}</span>
             </div>
             <div class="sev-item">
               <span class="sev-dot sev-dot--info" />
-              <span class="sev-label">Info</span>
+              <span class="sev-label">{{ t('alert.info') }}</span>
               <span class="sev-count">{{ stats.severity_breakdown?.info ?? 0 }}</span>
             </div>
           </div>

@@ -111,6 +111,7 @@ export default {
     window30d: '30 days',
     ackedCount: 'Acknowledged',
     resolvedCount: 'Resolved',
+    severityDistribution: 'Active Alert Distribution',
   },
   datasource: {
     title: 'Data Sources',
@@ -521,6 +522,8 @@ export default {
     activeAlerts: 'Active Alerts',
     uptime: 'Uptime',
     status: 'Engine Status',
+    rulesUnit: 'rules',
+    activeUnit: 'active',
   },
   schedule: {
     title: 'On-Call Schedule',

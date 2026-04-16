@@ -111,6 +111,7 @@ export default {
     window30d: '30天',
     ackedCount: '已确认告警',
     resolvedCount: '已解决告警',
+    severityDistribution: '活跃告警分布',
   },
   datasource: {
     title: '数据源管理',
@@ -530,6 +531,8 @@ export default {
     activeAlerts: '活跃告警',
     uptime: '运行时长',
     status: '引擎状态',
+    rulesUnit: '规则',
+    activeUnit: '活跃',
   },
   schedule: {
     title: '值班排班',
