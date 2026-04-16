@@ -32,10 +32,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - sreagent.example.com   # 替换为你的域名
+        - PLEASE_REPLACE.your-domain.com   # 替换为你的域名
       secretName: sreagent-tls
   rules:
-    - host: sreagent.example.com  # 替换为你的域名
+    - host: PLEASE_REPLACE.your-domain.com  # 替换为你的域名
       http:
         paths:
           - path: /

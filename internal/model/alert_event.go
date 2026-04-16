@@ -49,6 +49,9 @@ type AlertEvent struct {
 	// OnCall dispatch fields
 	OnCallUserID *uint `json:"oncall_user_id" gorm:"index"`        // user assigned via on-call
 	IsDispatched bool  `json:"is_dispatched" gorm:"default:false"` // whether an on-call assignment was made
+	// Lark Bot API message ID — set when the alert card was sent via Bot API (not Incoming Webhook).
+	// Non-empty value enables in-place card updates on status change.
+	LarkMessageID string `json:"lark_message_id" gorm:"size:128;default:''"`
 }
 
 func (AlertEvent) TableName() string {

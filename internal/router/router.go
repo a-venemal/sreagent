@@ -346,6 +346,7 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 
 			// Dashboard — all authenticated users
 			auth.GET("/dashboard/stats", handlers.Dashboard.GetStats)
+			auth.GET("/dashboard/mtta-mttr", handlers.Dashboard.GetMTTRStats)
 		}
 	}
 

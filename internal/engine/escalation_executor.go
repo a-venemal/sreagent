@@ -17,14 +17,17 @@ import (
 // EscalationExecutor periodically checks firing alert events and executes escalation steps
 // when the configured delay has elapsed and the alert has not yet been resolved or acknowledged.
 type EscalationExecutor struct {
-	policyRepo   *repository.EscalationPolicyRepository
-	stepRepo     *repository.EscalationStepRepository
-	eventRepo    *repository.AlertEventRepository
-	timelineRepo *repository.AlertTimelineRepository
-	channelRepo  *repository.NotifyChannelRepository
-	userRepo     *repository.UserRepository
-	notifySvc    *service.NotificationService
-	logger       *zap.Logger
+	policyRepo          *repository.EscalationPolicyRepository
+	stepRepo            *repository.EscalationStepRepository
+	eventRepo           *repository.AlertEventRepository
+	timelineRepo        *repository.AlertTimelineRepository
+	channelRepo         *repository.NotifyChannelRepository
+	userRepo            *repository.UserRepository
+	notifySvc           *service.NotificationService
+	userNotifyConfigRepo *repository.UserNotifyConfigRepository
+	teamRepo            service.TeamRepository
+	onCallShiftRepo     *repository.OnCallShiftRepository
+	logger              *zap.Logger
 
 	interval time.Duration
 	stopCh   chan struct{}
@@ -40,19 +43,25 @@ func NewEscalationExecutor(
 	channelRepo *repository.NotifyChannelRepository,
 	userRepo *repository.UserRepository,
 	notifySvc *service.NotificationService,
+	userNotifyConfigRepo *repository.UserNotifyConfigRepository,
+	teamRepo service.TeamRepository,
+	onCallShiftRepo *repository.OnCallShiftRepository,
 	logger *zap.Logger,
 ) *EscalationExecutor {
 	return &EscalationExecutor{
-		policyRepo:   policyRepo,
-		stepRepo:     stepRepo,
-		eventRepo:    eventRepo,
-		timelineRepo: timelineRepo,
-		channelRepo:  channelRepo,
-		userRepo:     userRepo,
-		notifySvc:    notifySvc,
-		logger:       logger,
-		interval:     60 * time.Second,
-		stopCh:       make(chan struct{}),
+		policyRepo:           policyRepo,
+		stepRepo:             stepRepo,
+		eventRepo:            eventRepo,
+		timelineRepo:         timelineRepo,
+		channelRepo:          channelRepo,
+		userRepo:             userRepo,
+		notifySvc:            notifySvc,
+		userNotifyConfigRepo: userNotifyConfigRepo,
+		teamRepo:             teamRepo,
+		onCallShiftRepo:      onCallShiftRepo,
+		logger:               logger,
+		interval:             60 * time.Second,
+		stopCh:               make(chan struct{}),
 	}
 }
 
@@ -192,13 +201,10 @@ func (e *EscalationExecutor) executeStep(ctx context.Context, event *model.Alert
 			return fmt.Errorf("send notification via channel %d: %w", *step.NotifyChannelID, err)
 		}
 	} else {
-		// No channel override — log the escalation (target lookup via user/team/schedule
-		// would require those repos; a production implementation would dispatch accordingly).
-		e.logger.Info("escalation: no channel configured for step, logging escalation only",
-			zap.Uint("event_id", event.ID),
-			zap.String("target_type", step.TargetType),
-			zap.Uint("target_id", step.TargetID),
-		)
+		// No channel override — dispatch directly to the target via personal notify configs.
+		if err := e.dispatchToTarget(ctx, event, step); err != nil {
+			return fmt.Errorf("dispatch to target %s/%d: %w", step.TargetType, step.TargetID, err)
+		}
 	}
 
 	// Record the escalation in the timeline so we don't repeat this step.
@@ -257,4 +263,110 @@ func (e *EscalationExecutor) listAllEnabledPolicies(ctx context.Context) ([]mode
 		}
 	}
 	return enabled, nil
+}
+
+// dispatchToTarget routes the escalation to the correct target based on step.TargetType.
+func (e *EscalationExecutor) dispatchToTarget(ctx context.Context, event *model.AlertEvent, step *model.EscalationStep) error {
+	switch step.TargetType {
+	case "user":
+		return e.notifyUserPersonal(ctx, event, step.TargetID)
+
+	case "team":
+		if e.teamRepo == nil {
+			e.logger.Warn("escalation: teamRepo not configured, skipping team dispatch",
+				zap.Uint("event_id", event.ID))
+			return nil
+		}
+		members, err := e.teamRepo.ListMembers(ctx, step.TargetID)
+		if err != nil {
+			return fmt.Errorf("list team members: %w", err)
+		}
+		var lastErr error
+		for _, m := range members {
+			if err := e.notifyUserPersonal(ctx, event, m.UserID); err != nil {
+				e.logger.Warn("escalation: failed to notify team member",
+					zap.Uint("user_id", m.UserID), zap.Error(err))
+				lastErr = err
+			}
+		}
+		return lastErr
+
+	case "schedule":
+		if e.onCallShiftRepo == nil {
+			e.logger.Warn("escalation: onCallShiftRepo not configured, skipping schedule dispatch",
+				zap.Uint("event_id", event.ID))
+			return nil
+		}
+		user, err := e.onCallShiftRepo.GetCurrentOnCallUser(ctx, step.TargetID)
+		if err != nil {
+			return fmt.Errorf("get current on-call user: %w", err)
+		}
+		if user == nil {
+			e.logger.Info("escalation: no one currently on call for schedule",
+				zap.Uint("schedule_id", step.TargetID))
+			return nil
+		}
+		return e.notifyUserPersonal(ctx, event, user.ID)
+
+	default:
+		e.logger.Warn("escalation: unknown target type, skipping",
+			zap.String("target_type", step.TargetType),
+			zap.Uint("event_id", event.ID))
+		return nil
+	}
+}
+
+// notifyUserPersonal sends a personal notification to a user via their UserNotifyConfig entries.
+// Supports "webhook" media type. "lark_personal" requires Bot API (future work).
+func (e *EscalationExecutor) notifyUserPersonal(ctx context.Context, event *model.AlertEvent, userID uint) error {
+	if e.userNotifyConfigRepo == nil {
+		e.logger.Warn("escalation: userNotifyConfigRepo not configured, skipping personal notify",
+			zap.Uint("user_id", userID))
+		return nil
+	}
+
+	configs, err := e.userNotifyConfigRepo.ListByUserID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("list user notify configs: %w", err)
+	}
+
+	if len(configs) == 0 {
+		e.logger.Info("escalation: user has no personal notify configs",
+			zap.Uint("user_id", userID))
+		return nil
+	}
+
+	var lastErr error
+	for _, cfg := range configs {
+		if !cfg.IsEnabled {
+			continue
+		}
+		switch cfg.MediaType {
+		case "webhook":
+			// UserNotifyConfig webhook config: {"url": "https://..."}
+			// custom_webhook channel accepts the same url field; method defaults to POST.
+			syntheticChannel := &model.NotifyChannel{
+				Type:   model.ChannelTypeCustom,
+				Config: cfg.Config,
+			}
+			if err := e.notifySvc.SendNotification(ctx, event, syntheticChannel, nil, nil); err != nil {
+				e.logger.Warn("escalation: personal webhook notify failed",
+					zap.Uint("user_id", userID), zap.Error(err))
+				lastErr = err
+			}
+		case "lark_personal":
+			// Requires Lark Bot API (send DM by user_id) — not yet implemented.
+			e.logger.Info("escalation: lark_personal notify requires Bot API, skipping",
+				zap.Uint("user_id", userID))
+		case "email":
+			// Requires system SMTP config lookup — skip for now, use a channel-based email rule instead.
+			e.logger.Info("escalation: personal email notify via escalation not yet implemented, use a notify channel instead",
+				zap.Uint("user_id", userID))
+		default:
+			e.logger.Warn("escalation: unsupported personal notify media type",
+				zap.String("media_type", cfg.MediaType), zap.Uint("user_id", userID))
+		}
+	}
+
+	return lastErr
 }

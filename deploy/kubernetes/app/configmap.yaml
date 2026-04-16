@@ -15,8 +15,8 @@ data:
       host: "0.0.0.0"
       port: 8080
       mode: "release"
-      # 修改为你的实际外部访问地址（用于通知消息中的链接）
-      external_base: "https://sreagent.example.com"
+      # ⚠ 必须替换：填入实际外部访问地址（用于通知消息中的跳转链接）
+      external_base: "https://PLEASE_REPLACE.your-domain.com"
 
     database:
       driver: mysql

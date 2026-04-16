@@ -18,6 +18,7 @@ import type {
   EscalationPolicy,
   EscalationStep,
   DashboardStats,
+  MTTRStats,
   MuteRule,
   NotifyRule,
   NotifyMedia,
@@ -425,6 +426,8 @@ export const userNotifyConfigApi = {
 export const dashboardApi = {
   getStats: () =>
     request.get<ApiResponse<DashboardStats>>('/dashboard/stats'),
+  getMTTRStats: (hours = 24) =>
+    request.get<ApiResponse<MTTRStats>>('/dashboard/mtta-mttr', { params: { hours } }),
 }
 
 // ===== AI API =====

@@ -121,6 +121,7 @@ func main() {
 	eventSvc := service.NewAlertEventService(eventRepo, timelineRepo, zapLogger)
 	authSvc := service.NewAuthService(userRepo, &cfg.JWT, zapLogger)
 	larkSvc := service.NewLarkService(zapLogger, cfg.Server.ExternalURL(), cfg.JWT.Secret)
+	larkSvc.SetSystemSettingService(settingSvc)
 	aiSvc := service.NewAIService(settingSvc, zapLogger)
 	queryClient := datasource.NewQueryClient()
 	contextBuilder := service.NewAlertContextBuilder(ruleRepo, dsRepo, queryClient, zapLogger)
@@ -220,8 +221,14 @@ func main() {
 	notifySvc.SetSubscribeRuleService(subscribeRuleSvc)
 	notifySvc.SetNotifyRuleService(notifyRuleSvc)
 
+	// Enable Bot API message_id persistence in the notification service
+	notifySvc.SetAlertEventRepository(eventRepo)
+
 	// Wire on-call resolver into alert event processing
 	eventSvc.SetOnCallResolver(scheduleSvc)
+
+	// Wire lark service for in-place card updates on status change
+	eventSvc.SetLarkService(larkSvc)
 
 	// Initialize Redis client (optional — graceful degradation if unavailable)
 	var redisClient *sredis.Client
@@ -253,6 +260,9 @@ func main() {
 		channelRepo,
 		userRepo,
 		notifySvc,
+		userNotifyConfigRepo,
+		teamRepo,
+		onCallShiftRepo,
 		zapLogger,
 	)
 	escalationExecutor.Start()

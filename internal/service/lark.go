@@ -18,6 +18,8 @@ type LarkService struct {
 	platformBaseURL string
 	// jwtSecret is used to sign alert action tokens.
 	jwtSecret string
+	// settingSvc provides Lark bot credentials for Bot API calls.
+	settingSvc *SystemSettingService
 }
 
 // NewLarkService creates a new LarkService.
@@ -28,6 +30,11 @@ func NewLarkService(logger *zap.Logger, platformBaseURL, jwtSecret string) *Lark
 		platformBaseURL: platformBaseURL,
 		jwtSecret:       jwtSecret,
 	}
+}
+
+// SetSystemSettingService injects the settings service for Bot API credential lookup.
+func (s *LarkService) SetSystemSettingService(svc *SystemSettingService) {
+	s.settingSvc = svc
 }
 
 // SendAlertNotification prepares and sends an alert notification via Lark webhook.
@@ -142,4 +149,106 @@ func (s *LarkService) SendTestNotification(ctx context.Context, webhookURL strin
 
 	s.logger.Info("lark test notification sent successfully")
 	return nil
+}
+
+// SendEnrichedAlertNotificationViaBot sends an alert card via Lark Bot API to a group chat.
+// Returns the message_id that can be used to update the card on status changes.
+// chatID is the group's chat_id (e.g. "oc_xxxxx").
+func (s *LarkService) SendEnrichedAlertNotificationViaBot(ctx context.Context, event *model.AlertEvent, analysis *AlertAnalysis, chatID string) (string, error) {
+	if s.settingSvc == nil {
+		return "", fmt.Errorf("settingSvc not configured for Bot API")
+	}
+
+	larkCfg, err := s.settingSvc.GetLarkConfig(ctx)
+	if err != nil || larkCfg.AppID == "" || larkCfg.AppSecret == "" {
+		return "", fmt.Errorf("lark bot credentials not configured")
+	}
+
+	card := s.buildEnrichedCard(event, analysis)
+	botClient := lark.NewBotClient(larkCfg.AppID, larkCfg.AppSecret)
+
+	msgID, err := botClient.SendMessage(ctx, chatID, card)
+	if err != nil {
+		s.logger.Error("failed to send alert card via Bot API",
+			zap.Uint("event_id", event.ID), zap.Error(err))
+		return "", fmt.Errorf("lark bot send failed: %w", err)
+	}
+
+	s.logger.Info("alert card sent via Bot API",
+		zap.Uint("event_id", event.ID),
+		zap.String("message_id", msgID),
+	)
+	return msgID, nil
+}
+
+// UpdateAlertCard patches the content of an existing card when the alert status changes.
+// messageID is the value stored in alert_events.lark_message_id.
+func (s *LarkService) UpdateAlertCard(ctx context.Context, event *model.AlertEvent, messageID string) error {
+	if s.settingSvc == nil {
+		return fmt.Errorf("settingSvc not configured for Bot API")
+	}
+	if messageID == "" {
+		return nil // nothing to update
+	}
+
+	larkCfg, err := s.settingSvc.GetLarkConfig(ctx)
+	if err != nil || larkCfg.AppID == "" || larkCfg.AppSecret == "" {
+		return fmt.Errorf("lark bot credentials not configured")
+	}
+
+	card := s.buildEnrichedCard(event, nil)
+	botClient := lark.NewBotClient(larkCfg.AppID, larkCfg.AppSecret)
+
+	if err := botClient.UpdateMessage(ctx, messageID, card); err != nil {
+		s.logger.Error("failed to update lark card",
+			zap.Uint("event_id", event.ID),
+			zap.String("message_id", messageID),
+			zap.Error(err),
+		)
+		return fmt.Errorf("lark card update failed: %w", err)
+	}
+
+	s.logger.Info("lark card updated",
+		zap.Uint("event_id", event.ID),
+		zap.String("message_id", messageID),
+		zap.String("new_status", string(event.Status)),
+	)
+	return nil
+}
+
+// buildEnrichedCard constructs the Lark interactive card for an alert event.
+func (s *LarkService) buildEnrichedCard(event *model.AlertEvent, analysis *AlertAnalysis) *lark.CardMessage {
+	platformURL := ""
+	if s.platformBaseURL != "" {
+		platformURL = fmt.Sprintf("%s/alert-events/%d", s.platformBaseURL, event.ID)
+	}
+	actionBaseURL := ""
+	if s.platformBaseURL != "" && s.jwtSecret != "" {
+		token, err := GenerateAlertActionToken(event.ID, s.jwtSecret)
+		if err == nil {
+			actionBaseURL = fmt.Sprintf("%s/alert-action/%s", s.platformBaseURL, token)
+		}
+	}
+
+	var aiResult *lark.AIAnalysisResult
+	if analysis != nil {
+		aiResult = &lark.AIAnalysisResult{
+			Summary:          analysis.Summary,
+			ProbableCauses:   analysis.ProbableCauses,
+			Impact:           analysis.Impact,
+			RecommendedSteps: analysis.RecommendedSteps,
+		}
+	}
+
+	return lark.BuildEnrichedAlertCard(
+		event.AlertName,
+		string(event.Severity),
+		string(event.Status),
+		event.Labels,
+		event.Annotations,
+		event.FiredAt,
+		aiResult,
+		platformURL,
+		actionBaseURL,
+	)
 }

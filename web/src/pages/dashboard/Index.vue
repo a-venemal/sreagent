@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { h, ref, onMounted } from 'vue'
+import { h, ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage, NTag } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
+import { use } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+import { PieChart, GaugeChart } from 'echarts/charts'
+import {
+  TooltipComponent,
+  LegendComponent,
+} from 'echarts/components'
+import VChart from 'vue-echarts'
 import { dashboardApi, alertEventApi, engineApi } from '@/api'
-import type { DashboardStats, AlertEvent, EngineStatus } from '@/types'
+import type { DashboardStats, MTTRStats, AlertEvent, EngineStatus } from '@/types'
 import { formatTime } from '@/utils/format'
 import { getSeverityType, getEventStatusType } from '@/utils/alert'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -14,14 +22,19 @@ import {
   CheckmarkCircleOutline,
   ReaderOutline,
   PulseOutline,
+  TimeOutline,
+  PeopleOutline,
+  LayersOutline,
 } from '@vicons/ionicons5'
+
+use([CanvasRenderer, PieChart, GaugeChart, TooltipComponent, LegendComponent])
 
 const router = useRouter()
 const message = useMessage()
 const { t } = useI18n()
 const loading = ref(false)
 const eventsLoading = ref(false)
-const engineLoading = ref(false)
+const mttrLoading = ref(false)
 
 const stats = ref<DashboardStats>({
   total_datasources: 0,
@@ -30,6 +43,7 @@ const stats = ref<DashboardStats>({
   resolved_today: 0,
   total_users: 0,
   total_teams: 0,
+  severity_breakdown: { critical: 0, warning: 0, info: 0 },
 })
 
 const engineStatus = ref<EngineStatus>({
@@ -41,12 +55,115 @@ const engineStatus = ref<EngineStatus>({
 
 const recentAlerts = ref<AlertEvent[]>([])
 
-const statCards = ref([
-  { titleKey: 'dashboard.activeAlerts', key: 'active_alerts' as const, icon: AlertCircleOutline, color: '#e88080' },
-  { titleKey: 'dashboard.dataSources', key: 'total_datasources' as const, icon: ServerOutline, color: '#18a058' },
-  { titleKey: 'dashboard.resolvedToday', key: 'resolved_today' as const, icon: CheckmarkCircleOutline, color: '#70c0e8' },
-  { titleKey: 'dashboard.totalRules', key: 'total_rules' as const, icon: ReaderOutline, color: '#f2c97d' },
-])
+const mttrWindowOptions = [
+  { label: '1h', value: 1 },
+  { label: '6h', value: 6 },
+  { label: '24h', value: 24 },
+  { label: '7d', value: 168 },
+  { label: '30d', value: 720 },
+]
+const mttrWindow = ref(24)
+const mttrStats = ref<MTTRStats>({
+  window_hours: 24,
+  mtta_seconds: -1,
+  mttr_seconds: -1,
+  acked_count: 0,
+  resolved_count: 0,
+})
+
+const statCards = [
+  { titleKey: 'dashboard.activeAlerts', key: 'active_alerts' as const, icon: AlertCircleOutline, color: '#e88080', gradient: 'linear-gradient(135deg, #e88080, #c0392b)' },
+  { titleKey: 'dashboard.dataSources', key: 'total_datasources' as const, icon: ServerOutline, color: '#18a058', gradient: 'linear-gradient(135deg, #18a058, #0d6e3e)' },
+  { titleKey: 'dashboard.resolvedToday', key: 'resolved_today' as const, icon: CheckmarkCircleOutline, color: '#70c0e8', gradient: 'linear-gradient(135deg, #70c0e8, #3498db)' },
+  { titleKey: 'dashboard.totalRules', key: 'total_rules' as const, icon: ReaderOutline, color: '#f2c97d', gradient: 'linear-gradient(135deg, #f2c97d, #e67e22)' },
+]
+
+// ECharts: severity donut
+const severityChartOption = computed(() => ({
+  backgroundColor: 'transparent',
+  tooltip: {
+    trigger: 'item',
+    formatter: '{b}: {c} ({d}%)',
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderColor: 'transparent',
+    textStyle: { color: '#fff', fontSize: 12 },
+  },
+  legend: {
+    orient: 'vertical',
+    right: '5%',
+    top: 'center',
+    textStyle: { color: '#aaa', fontSize: 12 },
+    itemWidth: 10,
+    itemHeight: 10,
+  },
+  series: [{
+    name: 'Severity',
+    type: 'pie',
+    radius: ['52%', '75%'],
+    center: ['38%', '50%'],
+    avoidLabelOverlap: false,
+    itemStyle: { borderRadius: 6, borderColor: 'transparent', borderWidth: 2 },
+    label: { show: false },
+    emphasis: {
+      label: { show: true, fontSize: 14, fontWeight: 'bold', color: '#fff' },
+      itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.4)' },
+    },
+    data: [
+      { value: stats.value.severity_breakdown?.critical ?? 0, name: 'Critical', itemStyle: { color: '#e88080' } },
+      { value: stats.value.severity_breakdown?.warning ?? 0, name: 'Warning', itemStyle: { color: '#f2c97d' } },
+      { value: stats.value.severity_breakdown?.info ?? 0, name: 'Info', itemStyle: { color: '#70c0e8' } },
+    ],
+  }],
+}))
+
+// ECharts: MTTA gauge
+const mttaGaugeOption = computed(() => {
+  const val = mttrStats.value.mtta_seconds
+  const display = formatDuration(val)
+  return makeGaugeOption(display, '#18a058', val >= 0)
+})
+
+const mttrGaugeOption = computed(() => {
+  const val = mttrStats.value.mttr_seconds
+  const display = formatDuration(val)
+  return makeGaugeOption(display, '#70c0e8', val >= 0)
+})
+
+function makeGaugeOption(label: string, color: string, hasData: boolean) {
+  return {
+    backgroundColor: 'transparent',
+    series: [{
+      type: 'gauge',
+      radius: '85%',
+      startAngle: 210,
+      endAngle: -30,
+      min: 0,
+      max: 100,
+      splitNumber: 0,
+      progress: {
+        show: hasData,
+        width: 10,
+        itemStyle: { color },
+      },
+      axisLine: {
+        lineStyle: { width: 10, color: [[1, 'rgba(255,255,255,0.08)']] },
+      },
+      axisTick: { show: false },
+      splitLine: { show: false },
+      axisLabel: { show: false },
+      pointer: { show: false },
+      detail: {
+        show: true,
+        offsetCenter: [0, '10%'],
+        formatter: label,
+        fontSize: hasData ? 20 : 16,
+        fontWeight: 'bold',
+        color: hasData ? '#e8e8e8' : '#555',
+      },
+      data: [{ value: hasData ? 50 : 0 }],
+    }],
+  }
+}
 
 const alertColumns = [
   {
@@ -62,7 +179,7 @@ const alertColumns = [
     ellipsis: { tooltip: true },
     render: (row: AlertEvent) =>
       h('a', {
-        style: 'color: var(--sre-info); cursor: pointer; text-decoration: none',
+        class: 'alert-link',
         onClick: () => router.push(`/alerts/events/${row.id}`),
       }, row.alert_name),
   },
@@ -83,12 +200,13 @@ const alertColumns = [
     title: () => t('alert.firedAt'),
     key: 'fired_at',
     width: 180,
-    render: (row: AlertEvent) => formatTime(row.fired_at),
+    render: (row: AlertEvent) => h('span', { style: 'font-size:12px' }, formatTime(row.fired_at)),
   },
   {
     title: () => t('alert.fireCount'),
     key: 'fire_count',
     width: 70,
+    align: 'center' as const,
   },
 ]
 
@@ -105,15 +223,31 @@ async function fetchStats() {
 }
 
 async function fetchEngineStatus() {
-  engineLoading.value = true
   try {
     const { data } = await engineApi.getStatus()
     engineStatus.value = data.data
-  } catch (err: any) {
-    // Engine status is non-critical, fail silently
+  } catch {
     engineStatus.value = { running: false, total_rules: 0, active_alerts: 0, uptime: '' }
+  }
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds < 0) return '-'
+  if (seconds < 60) return `${Math.round(seconds)}s`
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`
+  if (seconds < 86400) return `${(seconds / 3600).toFixed(1)}h`
+  return `${(seconds / 86400).toFixed(1)}d`
+}
+
+async function fetchMTTRStats() {
+  mttrLoading.value = true
+  try {
+    const { data } = await dashboardApi.getMTTRStats(mttrWindow.value)
+    mttrStats.value = data.data
+  } catch {
+    // non-critical
   } finally {
-    engineLoading.value = false
+    mttrLoading.value = false
   }
 }
 
@@ -133,6 +267,7 @@ onMounted(() => {
   fetchStats()
   fetchEngineStatus()
   fetchRecentAlerts()
+  fetchMTTRStats()
 })
 </script>
 
@@ -140,81 +275,145 @@ onMounted(() => {
   <div class="dashboard">
     <PageHeader :title="t('dashboard.title')" :subtitle="t('dashboard.subtitle')" />
 
-    <!-- Stats Cards -->
+    <!-- Top stat cards row -->
     <n-spin :show="loading">
-      <n-grid :x-gap="16" :y-gap="16" :cols="5" responsive="screen" style="margin-bottom: 24px">
+      <n-grid :x-gap="16" :y-gap="16" :cols="5" responsive="screen" style="margin-bottom: 20px">
         <n-gi v-for="card in statCards" :key="card.key">
-          <n-card class="stat-card card-hover" :bordered="false">
-            <div class="stat-content">
-              <div class="stat-info">
-                <div class="stat-label">{{ t(card.titleKey) }}</div>
-                <div class="stat-value">{{ stats[card.key] }}</div>
+          <div class="stat-card card-hover">
+            <div class="stat-card__accent" :style="{ background: card.gradient }" />
+            <div class="stat-card__body">
+              <div class="stat-card__icon" :style="{ background: card.color + '18', color: card.color }">
+                <n-icon :component="card.icon" :size="22" />
               </div>
-              <div class="stat-icon" :style="{ background: card.color + '15', color: card.color }">
-                <n-icon :component="card.icon" :size="28" />
+              <div class="stat-card__info">
+                <div class="stat-card__label">{{ t(card.titleKey) }}</div>
+                <div class="stat-card__value">{{ stats[card.key] }}</div>
               </div>
             </div>
-          </n-card>
+          </div>
         </n-gi>
 
-        <!-- Engine Status Card -->
+        <!-- Engine status card -->
         <n-gi>
-          <n-card class="stat-card card-hover" :bordered="false">
-            <div class="stat-content">
-              <div class="stat-info">
-                <div class="stat-label">
-                  {{ t('engine.title') }}
-                </div>
-                <div class="engine-status-row">
-                  <span class="engine-dot" :class="engineStatus.running ? 'engine-dot--running' : 'engine-dot--stopped'"></span>
-                  <span class="engine-status-text">{{ engineStatus.running ? t('engine.running') : t('engine.stopped') }}</span>
-                </div>
-                <div class="engine-meta">
-                  <span>{{ engineStatus.total_rules }} {{ t('engine.totalRules') }}</span>
-                  <span style="margin: 0 6px; opacity: 0.25">|</span>
-                  <span>{{ engineStatus.active_alerts }} {{ t('engine.activeAlerts') }}</span>
-                </div>
+          <div class="stat-card card-hover">
+            <div class="stat-card__accent" :style="{ background: engineStatus.running ? 'linear-gradient(135deg,#18a058,#0d6e3e)' : 'linear-gradient(135deg,#e88080,#c0392b)' }" />
+            <div class="stat-card__body">
+              <div class="stat-card__icon" :style="{ background: (engineStatus.running ? '#18a058' : '#e88080') + '18', color: engineStatus.running ? '#18a058' : '#e88080' }">
+                <n-icon :component="PulseOutline" :size="22" />
               </div>
-              <div class="stat-icon" :style="{ background: (engineStatus.running ? '#18a058' : '#e88080') + '15', color: engineStatus.running ? '#18a058' : '#e88080' }">
-                <n-icon :component="PulseOutline" :size="28" />
+              <div class="stat-card__info">
+                <div class="stat-card__label">{{ t('engine.title') }}</div>
+                <div class="engine-status-row">
+                  <span class="engine-dot" :class="engineStatus.running ? 'engine-dot--running' : 'engine-dot--stopped'" />
+                  <span class="stat-card__value" style="font-size:18px">
+                    {{ engineStatus.running ? t('engine.running') : t('engine.stopped') }}
+                  </span>
+                </div>
+                <div class="engine-meta">{{ engineStatus.total_rules }} rules · {{ engineStatus.active_alerts }} active</div>
               </div>
             </div>
-          </n-card>
+          </div>
         </n-gi>
       </n-grid>
     </n-spin>
 
-    <!-- Additional mini stats -->
-    <n-grid :x-gap="16" :y-gap="16" :cols="2" responsive="screen" style="margin-bottom: 24px">
-      <n-gi>
-        <n-card class="stat-card" :bordered="false">
-          <div class="stat-content">
-            <div class="stat-info">
-              <div class="stat-label">{{ t('dashboard.totalUsers') }}</div>
-              <div class="stat-value" style="font-size: 22px">{{ stats.total_users }}</div>
+    <!-- Middle row: charts + MTTA/MTTR -->
+    <n-grid :x-gap="16" :y-gap="16" :cols="12" style="margin-bottom: 20px">
+
+      <!-- Severity breakdown chart -->
+      <n-gi :span="4">
+        <div class="panel-card">
+          <div class="panel-card__header">
+            <span class="panel-card__title">Active Alert Distribution</span>
+          </div>
+          <div class="chart-donut-wrap">
+            <v-chart :option="severityChartOption" autoresize style="height:180px" />
+          </div>
+          <div class="sev-legend">
+            <div class="sev-item">
+              <span class="sev-dot sev-dot--critical" />
+              <span class="sev-label">Critical</span>
+              <span class="sev-count">{{ stats.severity_breakdown?.critical ?? 0 }}</span>
+            </div>
+            <div class="sev-item">
+              <span class="sev-dot sev-dot--warning" />
+              <span class="sev-label">Warning</span>
+              <span class="sev-count">{{ stats.severity_breakdown?.warning ?? 0 }}</span>
+            </div>
+            <div class="sev-item">
+              <span class="sev-dot sev-dot--info" />
+              <span class="sev-label">Info</span>
+              <span class="sev-count">{{ stats.severity_breakdown?.info ?? 0 }}</span>
             </div>
           </div>
-        </n-card>
+        </div>
       </n-gi>
-      <n-gi>
-        <n-card class="stat-card" :bordered="false">
-          <div class="stat-content">
-            <div class="stat-info">
-              <div class="stat-label">{{ t('dashboard.totalTeams') }}</div>
-              <div class="stat-value" style="font-size: 22px">{{ stats.total_teams }}</div>
+
+      <!-- MTTA/MTTR gauges -->
+      <n-gi :span="5">
+        <div class="panel-card" style="height:100%">
+          <div class="panel-card__header" style="justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:6px">
+              <n-icon :component="TimeOutline" size="15" style="color:#aaa" />
+              <span class="panel-card__title">MTTA / MTTR</span>
+            </div>
+            <n-radio-group v-model:value="mttrWindow" size="small" @update:value="fetchMTTRStats">
+              <n-radio-button v-for="opt in mttrWindowOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </n-radio-button>
+            </n-radio-group>
+          </div>
+          <n-spin :show="mttrLoading">
+            <div class="gauge-row">
+              <div class="gauge-item">
+                <v-chart :option="mttaGaugeOption" autoresize style="height:140px" />
+                <div class="gauge-label">MTTA</div>
+                <div class="gauge-sub">{{ mttrStats.acked_count }} {{ t('dashboard.ackedCount') }}</div>
+              </div>
+              <div class="gauge-divider" />
+              <div class="gauge-item">
+                <v-chart :option="mttrGaugeOption" autoresize style="height:140px" />
+                <div class="gauge-label">MTTR</div>
+                <div class="gauge-sub">{{ mttrStats.resolved_count }} {{ t('dashboard.resolvedCount') }}</div>
+              </div>
+            </div>
+          </n-spin>
+        </div>
+      </n-gi>
+
+      <!-- Users / Teams mini cards -->
+      <n-gi :span="3">
+        <div style="display:flex;flex-direction:column;gap:16px;height:100%">
+          <div class="mini-stat-card">
+            <div class="mini-stat-card__icon" style="background:#a855f718;color:#a855f7">
+              <n-icon :component="PeopleOutline" :size="20" />
+            </div>
+            <div>
+              <div class="mini-stat-label">{{ t('dashboard.totalUsers') }}</div>
+              <div class="mini-stat-value">{{ stats.total_users }}</div>
             </div>
           </div>
-        </n-card>
+          <div class="mini-stat-card">
+            <div class="mini-stat-card__icon" style="background:#06b6d418;color:#06b6d4">
+              <n-icon :component="LayersOutline" :size="20" />
+            </div>
+            <div>
+              <div class="mini-stat-label">{{ t('dashboard.totalTeams') }}</div>
+              <div class="mini-stat-value">{{ stats.total_teams }}</div>
+            </div>
+          </div>
+        </div>
       </n-gi>
     </n-grid>
 
     <!-- Recent Alerts Table -->
-    <n-card :title="t('dashboard.recentAlerts')" :bordered="false" style="background: var(--sre-bg-card); border-radius: 12px">
-      <template #header-extra>
-        <n-button text type="primary" @click="router.push('/alerts/events')">
-          {{ t('dashboard.viewAll') }}
+    <div class="panel-card">
+      <div class="panel-card__header" style="justify-content:space-between">
+        <span class="panel-card__title">{{ t('dashboard.recentAlerts') }}</span>
+        <n-button text type="primary" size="small" @click="router.push('/alerts/events')">
+          {{ t('dashboard.viewAll') }} →
         </n-button>
-      </template>
+      </div>
 
       <n-data-table
         v-if="recentAlerts.length > 0 || eventsLoading"
@@ -225,6 +424,7 @@ onMounted(() => {
         :bordered="false"
         size="small"
         :pagination="false"
+        :row-class-name="(row: AlertEvent) => row.severity === 'critical' ? 'row-critical' : row.severity === 'warning' ? 'row-warning' : ''"
       />
 
       <n-empty
@@ -238,88 +438,210 @@ onMounted(() => {
           </n-button>
         </template>
       </n-empty>
-    </n-card>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .dashboard {
-  max-width: 1400px;
+  max-width: 1440px;
 }
 
+/* ===== Stat Cards ===== */
 .stat-card {
   background: var(--sre-bg-card);
   border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
-
-.stat-content {
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+}
+.stat-card__accent {
+  height: 3px;
+  width: 100%;
+}
+.stat-card__body {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
 }
-
-.stat-label {
-  font-size: 13px;
-  color: var(--sre-text-secondary);
-  margin-bottom: 8px;
-}
-
-.stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--sre-text-primary);
-  line-height: 1;
-}
-
-.stat-icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
+.stat-card__icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
-
+.stat-card__label {
+  font-size: 12px;
+  color: var(--sre-text-secondary);
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+.stat-card__value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--sre-text-primary);
+  line-height: 1;
+}
 .engine-status-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 4px;
+  gap: 6px;
 }
-
 .engine-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-
 .engine-dot--running {
   background: #18a058;
-  box-shadow: 0 0 6px rgba(24, 160, 88, 0.6);
-  animation: engine-pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 6px rgba(24,160,88,0.7);
+  animation: pulse 2s ease-in-out infinite;
 }
-
 .engine-dot--stopped {
   background: #e88080;
-  box-shadow: 0 0 6px rgba(232, 128, 128, 0.4);
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(24,160,88,0.6); }
+  50% { box-shadow: 0 0 12px rgba(24,160,88,1); }
+}
+.engine-meta {
+  font-size: 11px;
+  color: var(--sre-text-secondary);
+  margin-top: 3px;
 }
 
-@keyframes engine-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(24, 160, 88, 0.6); }
-  50% { opacity: 0.6; box-shadow: 0 0 12px rgba(24, 160, 88, 0.9); }
+/* ===== Panel Card (chart containers) ===== */
+.panel-card {
+  background: var(--sre-bg-card);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+.panel-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.panel-card__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sre-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.engine-status-text {
-  font-size: 18px;
+/* ===== Severity legend ===== */
+.sev-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.sev-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.sev-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sev-dot--critical { background: #e88080; box-shadow: 0 0 4px rgba(232,128,128,0.6); }
+.sev-dot--warning  { background: #f2c97d; }
+.sev-dot--info     { background: #70c0e8; }
+.sev-label { flex: 1; color: var(--sre-text-secondary); }
+.sev-count { font-weight: 600; color: var(--sre-text-primary); }
+
+/* ===== Gauge ===== */
+.gauge-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.gauge-item {
+  flex: 1;
+  text-align: center;
+}
+.gauge-divider {
+  width: 1px;
+  height: 100px;
+  background: rgba(255,255,255,0.06);
+  margin: 0 8px;
+}
+.gauge-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sre-text-secondary);
+  margin-top: -12px;
+}
+.gauge-sub {
+  font-size: 11px;
+  color: var(--sre-text-secondary);
+  margin-top: 2px;
+}
+
+/* ===== Mini stat cards ===== */
+.mini-stat-card {
+  flex: 1;
+  background: var(--sre-bg-card);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: transform 0.2s;
+}
+.mini-stat-card:hover {
+  transform: translateY(-2px);
+}
+.mini-stat-card__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.mini-stat-label {
+  font-size: 12px;
+  color: var(--sre-text-secondary);
+  margin-bottom: 4px;
+}
+.mini-stat-value {
+  font-size: 22px;
   font-weight: 700;
   color: var(--sre-text-primary);
   line-height: 1;
 }
 
-.engine-meta {
-  font-size: 12px;
-  color: var(--sre-text-secondary);
-  margin-top: 6px;
+/* ===== Alert table link ===== */
+:deep(.alert-link) {
+  color: var(--sre-info);
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 500;
+}
+:deep(.alert-link:hover) {
+  text-decoration: underline;
+}
+:deep(.row-critical td) {
+  background-color: rgba(232,128,128,0.05) !important;
+  border-left: 2px solid rgba(232,128,128,0.4);
+}
+:deep(.row-warning td) {
+  background-color: rgba(242,201,125,0.04) !important;
 }
 </style>

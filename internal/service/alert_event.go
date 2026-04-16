@@ -22,6 +22,7 @@ type AlertEventService struct {
 	timelineRepo *repository.AlertTimelineRepository
 	notifySvc    *NotificationService
 	onCallSvc    OnCallResolver
+	larkSvc      *LarkService
 	logger       *zap.Logger
 }
 
@@ -33,6 +34,11 @@ func (s *AlertEventService) SetNotificationService(svc *NotificationService) {
 // SetOnCallResolver wires the on-call resolver for dispatch.
 func (s *AlertEventService) SetOnCallResolver(r OnCallResolver) {
 	s.onCallSvc = r
+}
+
+// SetLarkService wires the Lark service for in-place card updates via Bot API.
+func (s *AlertEventService) SetLarkService(svc *LarkService) {
+	s.larkSvc = svc
 }
 
 func NewAlertEventService(
@@ -83,6 +89,7 @@ func (s *AlertEventService) Acknowledge(ctx context.Context, eventID, userID uin
 	// Add timeline entry
 	s.addTimeline(ctx, eventID, model.TimelineActionAcknowledged, &userID, "Alert acknowledged")
 
+	s.triggerLarkCardUpdate(event)
 	return nil
 }
 
@@ -126,6 +133,7 @@ func (s *AlertEventService) Resolve(ctx context.Context, eventID, userID uint, r
 
 	s.addTimeline(ctx, eventID, model.TimelineActionResolved, &userID, resolution)
 
+	s.triggerLarkCardUpdate(event)
 	return nil
 }
 
@@ -149,6 +157,7 @@ func (s *AlertEventService) Close(ctx context.Context, eventID, userID uint, not
 	}
 	s.addTimeline(ctx, eventID, model.TimelineActionClosed, &userID, note)
 
+	s.triggerLarkCardUpdate(event)
 	return nil
 }
 
@@ -176,6 +185,7 @@ func (s *AlertEventService) Silence(ctx context.Context, eventID, userID uint, d
 	note := fmt.Sprintf("Alert silenced for %d minutes. Reason: %s", durationMinutes, reason)
 	s.addTimeline(ctx, eventID, model.TimelineActionSilenced, &userID, note)
 
+	s.triggerLarkCardUpdate(event)
 	return nil
 }
 
@@ -369,6 +379,23 @@ func (s *AlertEventService) processAlert(ctx context.Context, alert *model.Alert
 	)
 
 	return nil
+}
+
+// triggerLarkCardUpdate fires a background goroutine to patch the Lark card
+// when the alert was originally sent via Bot API (LarkMessageID is non-empty).
+func (s *AlertEventService) triggerLarkCardUpdate(event *model.AlertEvent) {
+	if s.larkSvc == nil || event.LarkMessageID == "" {
+		return
+	}
+	go func(e *model.AlertEvent) {
+		if err := s.larkSvc.UpdateAlertCard(context.Background(), e, e.LarkMessageID); err != nil {
+			s.logger.Warn("failed to update lark card after status change",
+				zap.Uint("event_id", e.ID),
+				zap.String("status", string(e.Status)),
+				zap.Error(err),
+			)
+		}
+	}(event)
 }
 
 func (s *AlertEventService) addTimeline(ctx context.Context, eventID uint, action model.AlertTimelineAction, operatorID *uint, note string) {

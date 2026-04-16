@@ -387,4 +387,15 @@ export interface DashboardStats {
   resolved_today: number
   total_users: number
   total_teams: number
+  severity_breakdown: { critical: number; warning: number; info: number }
+}
+
+export interface MTTRStats {
+  window_hours: number
+  /** Mean time to acknowledge in seconds, -1 if no data */
+  mtta_seconds: number
+  /** Mean time to resolve in seconds, -1 if no data */
+  mttr_seconds: number
+  acked_count: number
+  resolved_count: number
 }

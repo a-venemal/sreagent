@@ -58,9 +58,8 @@ spec:
 
       containers:
         - name: sreagent
-          # 替换为你的 Docker Hub 用户名，例如: johndoe/sreagent:latest
-          # 或使用具体版本号: johndoe/sreagent:v1.0.5
-          image: your-dockerhub-username/sreagent:latest
+          # ⚠ 必须替换：填入实际镜像地址，例如: johndoe/sreagent:latest 或 johndoe/sreagent:v1.0.5
+          image: PLEASE_REPLACE/sreagent:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -111,9 +110,9 @@ spec:
             # 开启 GORM SQL 调试（生产请设为 false）
             - name: SREAGENT_DB_DEBUG
               value: "false"
-            # CORS 允许域名（多个用逗号分隔）
+            # ⚠ 必须替换：填入实际访问域名，多个用逗号分隔
             - name: CORS_ALLOWED_ORIGINS
-              value: "https://sreagent.example.com"
+              value: "https://PLEASE_REPLACE.your-domain.com"
 
           resources:
             requests:

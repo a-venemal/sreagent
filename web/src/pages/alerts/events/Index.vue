@@ -10,7 +10,7 @@ import type { AlertEvent, AlertViewMode } from '@/types'
 import { formatTime, formatDuration } from '@/utils/format'
 import { getSeverityType, getStatusLabelKey, statusTagColor, severityRowClass } from '@/utils/alert'
 import PageHeader from '@/components/common/PageHeader.vue'
-import { RefreshOutline } from '@vicons/ionicons5'
+import { RefreshOutline, OptionsOutline, AlertCircleOutline } from '@vicons/ionicons5'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -49,12 +49,20 @@ const pageSize = ref(20)
 const checkedRowKeys = ref<number[]>([])
 
 // Filters
+const showFilters = ref(true)
 const statusFilter = ref<string[]>([])
 const severityFilter = ref<string[]>([])
 const alertNameSearch = ref('')
 const sourceFilter = ref('')
 const timeRangePreset = ref('24h')
 const customRange = ref<[number, number] | null>(null)
+
+// Count by status from current result (rough breakdown for badge)
+const statusCounts = computed(() => {
+  const m: Record<string, number> = { firing: 0, acknowledged: 0, assigned: 0, resolved: 0, closed: 0, silenced: 0 }
+  for (const e of events.value) m[e.status] = (m[e.status] || 0) + 1
+  return m
+})
 
 const statusOptions = [
   { label: () => t('alert.firing'), value: 'firing' },
@@ -72,11 +80,11 @@ const severityOptions = [
 ]
 
 const timePresets = [
-  { label: () => t('alert.last1h'), value: '1h' },
-  { label: () => t('alert.last6h'), value: '6h' },
-  { label: () => t('alert.last24h'), value: '24h' },
-  { label: () => t('alert.last7d'), value: '7d' },
-  { label: () => t('alert.last30d'), value: '30d' },
+  { label: '1h', value: '1h' },
+  { label: '6h', value: '6h' },
+  { label: '24h', value: '24h' },
+  { label: '7d', value: '7d' },
+  { label: '30d', value: '30d' },
 ]
 
 function getTimeRange(): { start_time?: string; end_time?: string } {
@@ -88,16 +96,10 @@ function getTimeRange(): { start_time?: string; end_time?: string } {
   }
   const now = new Date()
   const map: Record<string, number> = {
-    '1h': 3600000,
-    '6h': 21600000,
-    '24h': 86400000,
-    '7d': 604800000,
-    '30d': 2592000000,
+    '1h': 3600000, '6h': 21600000, '24h': 86400000, '7d': 604800000, '30d': 2592000000,
   }
   const ms = map[timeRangePreset.value]
-  if (ms) {
-    return { start_time: new Date(now.getTime() - ms).toISOString() }
-  }
+  if (ms) return { start_time: new Date(now.getTime() - ms).toISOString() }
   return {}
 }
 
@@ -117,22 +119,30 @@ const columns = [
     key: 'severity',
     width: 90,
     render: (row: AlertEvent) =>
-      h(NTag, { type: getSeverityType(row.severity), size: 'small', round: true }, { default: () => row.severity.toUpperCase() }),
+      h('div', { class: 'severity-cell' }, [
+        h('span', { class: `severity-bar severity-bar--${row.severity}` }),
+        h(NTag, { type: getSeverityType(row.severity), size: 'small', round: true }, { default: () => row.severity.toUpperCase() }),
+      ]),
   },
   {
     title: () => t('alert.alertName'),
     key: 'alert_name',
     ellipsis: { tooltip: true },
     minWidth: 180,
-    render: (row: AlertEvent) => h('a', {
-      style: 'color: var(--sre-info); cursor: pointer; text-decoration: none; font-weight: 500',
-      onClick: () => router.push(`/alerts/events/${row.id}`),
-    }, row.alert_name),
+    render: (row: AlertEvent) => h('div', { class: 'name-cell' }, [
+      row.severity === 'critical' && row.status === 'firing'
+        ? h('span', { class: 'critical-pulse' })
+        : null,
+      h('a', {
+        class: 'alert-link',
+        onClick: () => router.push(`/alerts/events/${row.id}`),
+      }, row.alert_name),
+    ]),
   },
   {
     title: () => t('common.status'),
     key: 'status',
-    width: 100,
+    width: 110,
     render: (row: AlertEvent) =>
       h(NTag, {
         size: 'small',
@@ -145,47 +155,52 @@ const columns = [
     key: 'source',
     width: 120,
     ellipsis: { tooltip: true },
+    render: (row: AlertEvent) => h('span', { style: 'font-size:12px;color:var(--sre-text-secondary)' }, row.source || '-'),
   },
   {
     title: () => t('alert.firedAt'),
     key: 'fired_at',
-    width: 170,
+    width: 160,
     render: (row: AlertEvent) => h('span', { style: 'font-size: 12px' }, formatTime(row.fired_at)),
   },
   {
     title: () => t('alert.duration'),
     key: 'duration',
-    width: 100,
-    render: (row: AlertEvent) => h('span', { style: 'font-size: 12px; color: var(--sre-text-secondary)' }, calcDuration(row)),
+    width: 90,
+    render: (row: AlertEvent) => h('span', { style: 'font-size:12px;color:var(--sre-text-secondary);font-variant-numeric:tabular-nums' }, calcDuration(row)),
   },
   {
-    title: () => t('alert.fireCount'),
+    title: '#',
     key: 'fire_count',
-    width: 60,
+    width: 50,
     align: 'center' as const,
+    render: (row: AlertEvent) => h('span', {
+      style: `font-size:11px;font-weight:600;color:${row.fire_count > 5 ? '#e88080' : 'var(--sre-text-secondary)'}`,
+    }, String(row.fire_count)),
   },
   {
     title: () => t('alert.ackedBy'),
     key: 'acked_by',
-    width: 100,
+    width: 90,
     render: (row: AlertEvent) =>
       h('span', { style: 'font-size: 12px' }, row.acked_by_user?.display_name || '-'),
   },
   {
     title: () => t('alert.oncallUser'),
     key: 'oncall_user',
-    width: 110,
+    width: 100,
     render: (row: AlertEvent) => {
       if (row.is_dispatched && row.oncall_user) {
-        return h('span', { style: 'font-size: 12px' }, row.oncall_user.display_name || row.oncall_user.username)
+        return h('span', { style: 'font-size:12px;color:#18a058' }, row.oncall_user.display_name || row.oncall_user.username)
       }
-      return h(NTag, { size: 'small', type: 'warning', bordered: false }, { default: () => t('alert.notDispatched') })
+      return h('span', { style: 'font-size:11px;color:#666' }, '-')
     },
   },
   {
     title: () => t('common.actions'),
     key: 'actions',
-    width: 180,
+    width: 170,
+    fixed: 'right' as const,
     render: (row: AlertEvent) => {
       const buttons: any[] = []
       if (row.status === 'firing') {
@@ -206,7 +221,7 @@ const columns = [
       buttons.push(
         h(NButton, { size: 'tiny', quaternary: true, onClick: () => router.push(`/alerts/events/${row.id}`) }, { default: () => t('alert.detail') })
       )
-      return h(NSpace, { size: 4 }, { default: () => buttons })
+      return h(NSpace, { size: 3 }, { default: () => buttons })
     },
   },
 ]
@@ -239,9 +254,7 @@ async function handleAck(id: number) {
     await alertEventApi.acknowledge(id)
     message.success(t('alert.alertAcknowledged'))
     fetchEvents()
-  } catch (err: any) {
-    message.error(err.message)
-  }
+  } catch (err: any) { message.error(err.message) }
 }
 
 async function handleResolve(id: number) {
@@ -249,9 +262,7 @@ async function handleResolve(id: number) {
     await alertEventApi.resolve(id, { resolution: t('alert.manuallyResolved') })
     message.success(t('alert.alertResolved'))
     fetchEvents()
-  } catch (err: any) {
-    message.error(err.message)
-  }
+  } catch (err: any) { message.error(err.message) }
 }
 
 async function handleClose(id: number) {
@@ -259,33 +270,27 @@ async function handleClose(id: number) {
     await alertEventApi.close(id)
     message.success(t('alert.alertClosed'))
     fetchEvents()
-  } catch (err: any) {
-    message.error(err.message)
-  }
+  } catch (err: any) { message.error(err.message) }
 }
 
 async function handleBatchAck() {
-  if (checkedRowKeys.value.length === 0) return
+  if (!checkedRowKeys.value.length) return
   try {
     await alertEventApi.batchAcknowledge(checkedRowKeys.value)
     message.success(t('alert.batchAckSuccess'))
     checkedRowKeys.value = []
     fetchEvents()
-  } catch (err: any) {
-    message.error(err.message)
-  }
+  } catch (err: any) { message.error(err.message) }
 }
 
 async function handleBatchClose() {
-  if (checkedRowKeys.value.length === 0) return
+  if (!checkedRowKeys.value.length) return
   try {
     await alertEventApi.batchClose(checkedRowKeys.value)
     message.success(t('alert.batchCloseSuccess'))
     checkedRowKeys.value = []
     fetchEvents()
-  } catch (err: any) {
-    message.error(err.message)
-  }
+  } catch (err: any) { message.error(err.message) }
 }
 
 function resetFilters() {
@@ -301,72 +306,97 @@ function resetFilters() {
 
 function handleTimePreset(preset: string) {
   timeRangePreset.value = preset
-  if (preset !== 'custom') {
-    customRange.value = null
-  }
+  if (preset !== 'custom') customRange.value = null
   page.value = 1
   fetchEvents()
 }
 
 function handleCustomRange(val: [number, number] | null) {
   customRange.value = val
-  if (val) {
-    timeRangePreset.value = 'custom'
-    page.value = 1
-    fetchEvents()
-  }
+  if (val) { timeRangePreset.value = 'custom'; page.value = 1; fetchEvents() }
 }
 
-// Auto-refresh every 30 seconds
 let refreshTimer: ReturnType<typeof setInterval> | null = null
-onMounted(() => {
-  fetchEvents()
-  refreshTimer = setInterval(fetchEvents, 30000)
-})
-onUnmounted(() => {
-  if (refreshTimer) clearInterval(refreshTimer)
-})
+onMounted(() => { fetchEvents(); refreshTimer = setInterval(fetchEvents, 30000) })
+onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
 
 const selectedText = computed(() => t('alert.selectedCount', { n: checkedRowKeys.value.length }))
+function onCheckedRowKeysUpdate(keys: RowKey[]) { checkedRowKeys.value = keys as number[] }
 
-function onCheckedRowKeysUpdate(keys: RowKey[]) {
-  checkedRowKeys.value = keys as number[]
-}
+const activeFiltersCount = computed(() => {
+  let n = 0
+  if (statusFilter.value.length) n++
+  if (severityFilter.value.length) n++
+  if (alertNameSearch.value) n++
+  if (sourceFilter.value) n++
+  if (timeRangePreset.value !== '24h') n++
+  return n
+})
 </script>
 
 <template>
   <div class="events-page">
     <PageHeader :title="t('alert.events')" :subtitle="t('alert.eventsSubtitle')">
       <template #actions>
-        <n-text depth="3">{{ t('alert.totalAlerts', { n: total }) }}</n-text>
-        <n-button @click="fetchEvents" :loading="loading">
+        <n-text depth="3" style="font-size:13px">{{ t('alert.totalAlerts', { n: total }) }}</n-text>
+        <n-button size="small" @click="fetchEvents" :loading="loading">
           <template #icon><n-icon :component="RefreshOutline" /></template>
           {{ t('common.refresh') }}
         </n-button>
       </template>
     </PageHeader>
 
-    <!-- View mode tabs -->
-    <div class="view-mode-bar">
-      <n-radio-group :value="viewMode" @update:value="handleViewModeChange" size="medium">
-        <n-radio-button
-          v-for="opt in viewModeOptions"
-          :key="opt.value"
-          :value="opt.value"
-          :label="opt.label"
-        />
+    <!-- Toolbar: view mode + filter toggle + time presets -->
+    <div class="toolbar">
+      <n-radio-group :value="viewMode" @update:value="handleViewModeChange" size="small">
+        <n-radio-button v-for="opt in viewModeOptions" :key="opt.value" :value="opt.value" :label="opt.label" />
       </n-radio-group>
+
+      <div class="toolbar-sep" />
+
+      <!-- Time presets -->
+      <div class="time-presets">
+        <button
+          v-for="p in timePresets"
+          :key="p.value"
+          class="time-chip"
+          :class="{ active: timeRangePreset === p.value }"
+          @click="handleTimePreset(p.value)"
+        >{{ p.label }}</button>
+        <n-date-picker
+          type="datetimerange"
+          :value="customRange"
+          clearable
+          size="small"
+          style="width:300px"
+          @update:value="handleCustomRange"
+        />
+      </div>
+
+      <div style="flex:1" />
+
+      <!-- Filter toggle -->
+      <n-button
+        size="small"
+        :secondary="showFilters"
+        :type="activeFiltersCount > 0 ? 'primary' : 'default'"
+        @click="showFilters = !showFilters"
+      >
+        <template #icon><n-icon :component="OptionsOutline" /></template>
+        Filters
+        <n-badge v-if="activeFiltersCount > 0" :value="activeFiltersCount" style="margin-left:4px" />
+      </n-button>
     </div>
 
-    <!-- Filter bar -->
-    <div class="filter-bar">
+    <!-- Collapsible filter bar -->
+    <div v-show="showFilters" class="filter-bar">
       <n-select
         v-model:value="statusFilter"
         :options="statusOptions"
         multiple
         :placeholder="t('common.status')"
         clearable
-        style="width: 220px"
+        style="width:220px"
         @update:value="() => { page = 1; fetchEvents() }"
       />
       <n-select
@@ -375,61 +405,51 @@ function onCheckedRowKeysUpdate(keys: RowKey[]) {
         multiple
         :placeholder="t('alert.severity')"
         clearable
-        style="width: 200px"
+        style="width:190px"
         @update:value="() => { page = 1; fetchEvents() }"
       />
       <n-input
         v-model:value="alertNameSearch"
         :placeholder="t('alert.alertNameSearch')"
         clearable
-        style="width: 200px"
+        style="width:200px"
         @update:value="() => { page = 1; fetchEvents() }"
       />
       <n-input
         v-model:value="sourceFilter"
         :placeholder="t('alert.sourceFilter')"
         clearable
-        style="width: 160px"
+        style="width:150px"
         @update:value="() => { page = 1; fetchEvents() }"
       />
-      <n-button quaternary @click="resetFilters">{{ t('alert.resetFilters') }}</n-button>
+      <n-button size="small" @click="resetFilters" :disabled="activeFiltersCount === 0">
+        {{ t('alert.resetFilters') }}
+      </n-button>
     </div>
 
-    <!-- Time range quick buttons -->
-    <div class="time-range-bar">
-      <n-space size="small">
-        <n-button
-          v-for="preset in timePresets"
-          :key="preset.value"
-          size="small"
-          :type="timeRangePreset === preset.value ? 'primary' : 'default'"
-          :secondary="timeRangePreset === preset.value"
-          @click="handleTimePreset(preset.value)"
-        >
-          {{ preset.label() }}
-        </n-button>
-        <n-date-picker
-          type="datetimerange"
-          :value="customRange"
-          clearable
-          size="small"
-          style="width: 340px"
-          @update:value="handleCustomRange"
-        />
-      </n-space>
+    <!-- Status summary badges -->
+    <div class="status-summary">
+      <div v-for="(count, status) in statusCounts" :key="status" v-show="count > 0" class="status-pill" :class="`status-pill--${status}`">
+        <span class="status-pill__dot" />
+        <span>{{ status }}</span>
+        <span class="status-pill__count">{{ count }}</span>
+      </div>
     </div>
 
     <!-- Batch actions bar -->
-    <div v-if="checkedRowKeys.length > 0" class="batch-bar">
-      <n-space align="center" size="small">
-        <n-text depth="3">{{ selectedText }}</n-text>
+    <transition name="slide-down">
+      <div v-if="checkedRowKeys.length > 0" class="batch-bar">
+        <n-icon :component="AlertCircleOutline" size="16" style="color:#637dff" />
+        <span class="batch-bar__text">{{ selectedText }}</span>
+        <div style="flex:1" />
         <n-button size="small" type="primary" @click="handleBatchAck">{{ t('alert.batchAck') }}</n-button>
         <n-button size="small" type="error" @click="handleBatchClose">{{ t('alert.batchClose') }}</n-button>
-      </n-space>
-    </div>
+        <n-button size="small" quaternary @click="checkedRowKeys = []">{{ t('common.cancel') }}</n-button>
+      </div>
+    </transition>
 
     <!-- Events Table -->
-    <n-card :bordered="false" style="background: var(--sre-bg-card); border-radius: 12px">
+    <n-card :bordered="false" style="background:var(--sre-bg-card);border-radius:12px">
       <n-data-table
         :loading="loading"
         :columns="columns"
@@ -439,10 +459,9 @@ function onCheckedRowKeysUpdate(keys: RowKey[]) {
         :checked-row-keys="checkedRowKeys"
         @update:checked-row-keys="onCheckedRowKeysUpdate"
         :bordered="false"
+        scroll-x="1100"
         :pagination="{
-          page: page,
-          pageSize: pageSize,
-          itemCount: total,
+          page, pageSize, itemCount: total,
           showSizePicker: true,
           pageSizes: [20, 50, 100],
           onChange: (p: number) => { page = p; fetchEvents() },
@@ -454,39 +473,168 @@ function onCheckedRowKeysUpdate(keys: RowKey[]) {
 </template>
 
 <style scoped>
-.events-page {
-  max-width: 1400px;
+.events-page { max-width: 1440px; }
+
+/* ===== Toolbar ===== */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  background: var(--sre-bg-card);
+  border-radius: 10px;
+  padding: 10px 16px;
+}
+.toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: rgba(255,255,255,0.08);
+}
+.time-presets {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.time-chip {
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: var(--sre-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.time-chip:hover { background: rgba(255,255,255,0.06); color: var(--sre-text-primary); }
+.time-chip.active {
+  background: rgba(24,160,88,0.15);
+  border-color: rgba(24,160,88,0.5);
+  color: #18a058;
+  font-weight: 600;
 }
 
-.view-mode-bar {
-  margin-bottom: 14px;
-}
-
+/* ===== Filter bar ===== */
 .filter-bar {
   display: flex;
   gap: 10px;
   margin-bottom: 12px;
   flex-wrap: wrap;
   align-items: center;
+  background: var(--sre-bg-card);
+  border-radius: 10px;
+  padding: 12px 16px;
+  border: 1px solid rgba(255,255,255,0.06);
 }
 
-.time-range-bar {
-  margin-bottom: 12px;
+/* ===== Status summary ===== */
+.status-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  min-height: 24px;
+}
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px 3px 7px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255,255,255,0.05);
+  color: var(--sre-text-secondary);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.status-pill__dot {
+  width: 6px; height: 6px; border-radius: 50%;
+}
+.status-pill__count {
+  font-weight: 700;
+  margin-left: 3px;
+}
+.status-pill--firing { background: rgba(232,128,128,0.1); border-color: rgba(232,128,128,0.3); color: #e88080; }
+.status-pill--firing .status-pill__dot { background: #e88080; animation: pulse-dot 1.5s ease-in-out infinite; }
+.status-pill--acknowledged { background: rgba(242,201,125,0.1); border-color: rgba(242,201,125,0.3); color: #f2c97d; }
+.status-pill--acknowledged .status-pill__dot { background: #f2c97d; }
+.status-pill--assigned { background: rgba(112,192,232,0.1); border-color: rgba(112,192,232,0.3); color: #70c0e8; }
+.status-pill--assigned .status-pill__dot { background: #70c0e8; }
+.status-pill--resolved { background: rgba(24,160,88,0.1); border-color: rgba(24,160,88,0.3); color: #18a058; }
+.status-pill--resolved .status-pill__dot { background: #18a058; }
+.status-pill--closed .status-pill__dot { background: #666; }
+.status-pill--silenced { background: rgba(168,85,247,0.1); border-color: rgba(168,85,247,0.3); color: #a855f7; }
+.status-pill--silenced .status-pill__dot { background: #a855f7; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(232,128,128,0.5); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 3px rgba(232,128,128,0); }
 }
 
+/* ===== Batch bar ===== */
 .batch-bar {
-  background: rgba(99, 125, 255, 0.1);
-  border: 1px solid rgba(99, 125, 255, 0.25);
-  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(99,125,255,0.08);
+  border: 1px solid rgba(99,125,255,0.2);
+  border-radius: 10px;
   padding: 8px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
+}
+.batch-bar__text {
+  font-size: 13px;
+  color: #637dff;
+  font-weight: 500;
+}
+.slide-down-enter-active, .slide-down-leave-active {
+  transition: all 0.2s ease;
+}
+.slide-down-enter-from, .slide-down-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
-:deep(.row-critical) {
-  background-color: rgba(232, 128, 128, 0.04) !important;
+/* ===== Table cell styles ===== */
+:deep(.severity-cell) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
+:deep(.severity-bar) {
+  width: 3px;
+  height: 20px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+:deep(.severity-bar--critical) { background: #e88080; box-shadow: 0 0 4px rgba(232,128,128,0.6); }
+:deep(.severity-bar--warning)  { background: #f2c97d; }
+:deep(.severity-bar--info)     { background: #70c0e8; }
 
-:deep(.row-warning) {
-  background-color: rgba(242, 201, 125, 0.04) !important;
+:deep(.name-cell) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+:deep(.critical-pulse) {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #e88080;
+  flex-shrink: 0;
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+:deep(.alert-link) {
+  color: var(--sre-info);
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 500;
+}
+:deep(.alert-link:hover) { text-decoration: underline; }
+
+:deep(.row-critical td) {
+  background-color: rgba(232,128,128,0.04) !important;
+}
+:deep(.row-warning td) {
+  background-color: rgba(242,201,125,0.03) !important;
 }
 </style>

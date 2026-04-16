@@ -24,6 +24,7 @@ type NotificationService struct {
 	channelRepo   *repository.NotifyChannelRepository
 	policyRepo    *repository.NotifyPolicyRepository
 	recordRepo    *repository.NotifyRecordRepository
+	eventRepo     *repository.AlertEventRepository
 	larkSvc       *LarkService
 	pipeline      *AlertPipeline
 	subscribeSvc  *SubscribeRuleService
@@ -60,6 +61,12 @@ func (s *NotificationService) SetSubscribeRuleService(svc *SubscribeRuleService)
 // This uses setter injection to avoid circular dependency issues.
 func (s *NotificationService) SetNotifyRuleService(svc *NotifyRuleService) {
 	s.notifyRuleSvc = svc
+}
+
+// SetAlertEventRepository injects the event repo so the notification service can
+// persist lark_message_id after a successful Bot API send.
+func (s *NotificationService) SetAlertEventRepository(repo *repository.AlertEventRepository) {
+	s.eventRepo = repo
 }
 
 // RouteAlert is the main routing function. It finds matching policies by alert
@@ -187,12 +194,37 @@ func (s *NotificationService) processSubscriptions(ctx context.Context, event *m
 func (s *NotificationService) SendNotification(ctx context.Context, event *model.AlertEvent, channel *model.NotifyChannel, policy *model.NotifyPolicy, analysis *AlertAnalysis) error {
 	switch channel.Type {
 	case model.ChannelTypeLarkWebhook, model.ChannelTypeLarkBot:
-		webhookURL, err := extractWebhookURL(channel.Config)
-		if err != nil {
+		var larkCfg struct {
+			WebhookURL string `json:"webhook_url"`
+			ChatID     string `json:"chat_id"`
+		}
+		if err := json.Unmarshal([]byte(channel.Config), &larkCfg); err != nil {
 			return fmt.Errorf("invalid channel config: %w", err)
 		}
-		// Use enriched card if analysis is available, otherwise fall back to basic card
-		return s.larkSvc.SendEnrichedAlertNotification(ctx, event, analysis, webhookURL)
+		if larkCfg.ChatID != "" {
+			// Bot API path: returns message_id which enables in-place card updates
+			msgID, err := s.larkSvc.SendEnrichedAlertNotificationViaBot(ctx, event, analysis, larkCfg.ChatID)
+			if err != nil {
+				return err
+			}
+			if msgID != "" && event.LarkMessageID == "" {
+				event.LarkMessageID = msgID
+				if s.eventRepo != nil {
+					if dbErr := s.eventRepo.Update(ctx, event); dbErr != nil {
+						s.logger.Warn("failed to persist lark_message_id",
+							zap.Uint("event_id", event.ID),
+							zap.Error(dbErr),
+						)
+					}
+				}
+			}
+			return nil
+		}
+		if larkCfg.WebhookURL == "" {
+			return fmt.Errorf("lark channel config must specify webhook_url or chat_id")
+		}
+		// Incoming Webhook path (no message_id, cards cannot be updated later)
+		return s.larkSvc.SendEnrichedAlertNotification(ctx, event, analysis, larkCfg.WebhookURL)
 
 	case model.ChannelTypeEmail:
 		return s.sendEmailNotification(ctx, event, channel, analysis)
