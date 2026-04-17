@@ -29,7 +29,7 @@ func (r *AlertRuleRepository) GetByID(ctx context.Context, id uint) (*model.Aler
 	return &rule, nil
 }
 
-func (r *AlertRuleRepository) List(ctx context.Context, severity, status, groupName string, page, pageSize int) ([]model.AlertRule, int64, error) {
+func (r *AlertRuleRepository) List(ctx context.Context, severity, status, groupName, category string, page, pageSize int) ([]model.AlertRule, int64, error) {
 	var list []model.AlertRule
 	var total int64
 
@@ -43,6 +43,9 @@ func (r *AlertRuleRepository) List(ctx context.Context, severity, status, groupN
 	if groupName != "" {
 		query = query.Where("group_name = ?", groupName)
 	}
+	if category != "" {
+		query = query.Where("category = ?", category)
+	}
 
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -54,6 +57,15 @@ func (r *AlertRuleRepository) List(ctx context.Context, severity, status, groupN
 	}
 
 	return list, total, nil
+}
+
+// ListCategories returns all distinct non-empty category values.
+func (r *AlertRuleRepository) ListCategories(ctx context.Context) ([]string, error) {
+	var categories []string
+	err := r.db.WithContext(ctx).Model(&model.AlertRule{}).
+		Where("category != '' AND deleted_at IS NULL").
+		Distinct("category").Pluck("category", &categories).Error
+	return categories, err
 }
 
 func (r *AlertRuleRepository) Update(ctx context.Context, rule *model.AlertRule) error {

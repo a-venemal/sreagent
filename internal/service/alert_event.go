@@ -112,6 +112,8 @@ func (s *AlertEventService) Assign(ctx context.Context, eventID, assignTo, opera
 	}
 	s.addTimeline(ctx, eventID, model.TimelineActionAssigned, &operatorID, note)
 
+	s.triggerLarkCardUpdate(event)
+
 	return nil
 }
 

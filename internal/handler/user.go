@@ -8,11 +8,16 @@ import (
 )
 
 type UserHandler struct {
-	svc *service.UserService
+	svc      *service.UserService
+	auditSvc *service.AuditLogService
 }
 
 func NewUserHandler(svc *service.UserService) *UserHandler {
 	return &UserHandler{svc: svc}
+}
+
+func (h *UserHandler) SetAuditService(svc *service.AuditLogService) {
+	h.auditSvc = svc
 }
 
 // CreateUserRequest is the request body for creating a user.
@@ -78,6 +83,14 @@ func (h *UserHandler) Create(c *gin.Context) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		uid := GetCurrentUserID(c)
+		h.auditSvc.Record(&model.AuditLog{
+			UserID: &uid, Username: GetCurrentUsername(c),
+			Action: model.AuditActionCreate, ResourceType: model.AuditResourceUser,
+			ResourceID: &user.ID, ResourceName: user.Username, IP: c.ClientIP(),
+		})
+	}
 	Success(c, user)
 }
 
@@ -142,6 +155,14 @@ func (h *UserHandler) Update(c *gin.Context) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		uid := GetCurrentUserID(c)
+		h.auditSvc.Record(&model.AuditLog{
+			UserID: &uid, Username: GetCurrentUsername(c),
+			Action: model.AuditActionUpdate, ResourceType: model.AuditResourceUser,
+			ResourceID: &id, IP: c.ClientIP(),
+		})
+	}
 	Success(c, user)
 }
 
@@ -164,6 +185,18 @@ func (h *UserHandler) ToggleActive(c *gin.Context) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		uid := GetCurrentUserID(c)
+		detail := "deactivated"
+		if req.IsActive {
+			detail = "activated"
+		}
+		h.auditSvc.Record(&model.AuditLog{
+			UserID: &uid, Username: GetCurrentUsername(c),
+			Action: model.AuditActionToggle, ResourceType: model.AuditResourceUser,
+			ResourceID: &id, Detail: detail, IP: c.ClientIP(),
+		})
+	}
 	Success(c, nil)
 }
 
@@ -243,5 +276,13 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		uid := GetCurrentUserID(c)
+		h.auditSvc.Record(&model.AuditLog{
+			UserID: &uid, Username: GetCurrentUsername(c),
+			Action: model.AuditActionDelete, ResourceType: model.AuditResourceUser,
+			ResourceID: &id, IP: c.ClientIP(),
+		})
+	}
 	Success(c, nil)
 }

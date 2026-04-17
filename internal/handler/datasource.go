@@ -152,3 +152,28 @@ func (h *DataSourceHandler) HealthCheck(c *gin.Context) {
 
 	Success(c, gin.H{"status": status})
 }
+
+// Query tests an expression against a datasource.
+// POST /api/v1/datasources/:id/query
+func (h *DataSourceHandler) Query(c *gin.Context) {
+	id, err := GetIDParam(c, "id")
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	var req struct {
+		Expression string `json:"expression" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorWithMessage(c, 10001, err.Error())
+		return
+	}
+
+	result, err := h.svc.QueryDatasource(c.Request.Context(), id, req.Expression)
+	if err != nil {
+		Error(c, err)
+		return
+	}
+	Success(c, result)
+}

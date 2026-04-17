@@ -9,6 +9,7 @@ import BizGroupManagement from './BizGroupManagement.vue'
 import AIConfig from './AIConfig.vue'
 import LarkBotConfig from './LarkBotConfig.vue'
 import OIDCConfig from './OIDCConfig.vue'
+import AuditLog from './AuditLog.vue'
 
 const { t } = useI18n()
 const activeTab = ref('users')
@@ -49,6 +50,10 @@ const userMgmtRef = ref<InstanceType<typeof UserManagement> | null>(null)
 
         <n-tab-pane name="oidc" :tab="t('settings.oidcConfig')">
           <OIDCConfig />
+        </n-tab-pane>
+
+        <n-tab-pane name="audit" :tab="t('settings.auditLog')">
+          <AuditLog />
         </n-tab-pane>
       </n-tabs>
     </n-card>

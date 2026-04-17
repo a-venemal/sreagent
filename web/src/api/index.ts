@@ -28,6 +28,11 @@ import type {
   EngineStatus,
   AlertChannel,
   UserNotifyConfig,
+  AuditLog,
+  AlertTrendPoint,
+  TopRuleItem,
+  SeverityHistoryPoint,
+  QueryResponse,
 } from '@/types'
 
 // ===== Auth API =====
@@ -68,11 +73,14 @@ export const datasourceApi = {
 
   healthCheck: (id: number) =>
     request.post<ApiResponse<{ status: string }>>(`/datasources/${id}/health-check`),
+
+  query: (id: number, data: { expression: string }) =>
+    request.post<ApiResponse<QueryResponse>>(`/datasources/${id}/query`, data),
 }
 
 // ===== Alert Rule API =====
 export const alertRuleApi = {
-  list: (params?: { page?: number; page_size?: number; severity?: string; status?: string; group_name?: string }) =>
+  list: (params?: { page?: number; page_size?: number; severity?: string; status?: string; group_name?: string; category?: string }) =>
     request.get<ApiResponse<PageData<AlertRule>>>('/alert-rules', { params }),
 
   get: (id: number) =>
@@ -89,6 +97,21 @@ export const alertRuleApi = {
 
   toggleStatus: (id: number, status: string) =>
     request.patch<ApiResponse<null>>(`/alert-rules/${id}/status`, { status }),
+
+  listCategories: () =>
+    request.get<ApiResponse<string[]>>('/alert-rules/categories'),
+
+  exportRules: (params?: { format?: string; category?: string; group_name?: string }) =>
+    request.get('/alert-rules/export', { params, responseType: 'blob' }),
+
+  importRules: (file: File, datasourceId?: number) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    if (datasourceId) formData.append('datasource_id', String(datasourceId))
+    return request.post<ApiResponse<{ total: number; success: number; failed: number; errors: string[] }>>('/alert-rules/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
 }
 
 // ===== Alert Event API =====
@@ -428,6 +451,12 @@ export const dashboardApi = {
     request.get<ApiResponse<DashboardStats>>('/dashboard/stats'),
   getMTTRStats: (hours = 24) =>
     request.get<ApiResponse<MTTRStats>>('/dashboard/mtta-mttr', { params: { hours } }),
+  getAlertTrend: (days = 30) =>
+    request.get<ApiResponse<AlertTrendPoint[]>>('/dashboard/alert-trend', { params: { days } }),
+  getTopRules: (days = 30, limit = 10) =>
+    request.get<ApiResponse<TopRuleItem[]>>('/dashboard/top-rules', { params: { days, limit } }),
+  getSeverityHistory: (days = 30) =>
+    request.get<ApiResponse<SeverityHistoryPoint[]>>('/dashboard/severity-history', { params: { days } }),
 }
 
 // ===== AI API =====
@@ -455,6 +484,15 @@ export const larkBotApi = {
 
   updateConfig: (data: { app_id?: string; app_secret?: string; default_webhook?: string; verification_token?: string; encrypt_key?: string; bot_enabled?: boolean }) =>
     request.put<ApiResponse<null>>('/lark/bot/config', data),
+}
+
+// ===== Audit Log API =====
+export const auditLogApi = {
+  list: (params?: {
+    page?: number; page_size?: number;
+    action?: string; resource_type?: string;
+    start_time?: string; end_time?: string;
+  }) => request.get<ApiResponse<PageData<AuditLog>>>('/audit-logs', { params }),
 }
 
 // ===== OIDC Settings API =====

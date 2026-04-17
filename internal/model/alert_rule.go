@@ -36,6 +36,7 @@ type AlertRule struct {
 	Status      AlertRuleStatus `json:"status" gorm:"size:32;default:enabled;index"`
 	// Grouping
 	GroupName string `json:"group_name" gorm:"size:128;index"`
+	Category  string `json:"category" gorm:"size:64;index;default:''"`
 	// Version tracking
 	Version   int  `json:"version" gorm:"default:1"`
 	CreatedBy uint `json:"created_by" gorm:"index"`

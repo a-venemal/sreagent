@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS `audit_logs` (
+  `id`            bigint unsigned NOT NULL AUTO_INCREMENT,
+  `created_at`    datetime(3)     NULL,
+  `updated_at`    datetime(3)     NULL,
+  `deleted_at`    datetime(3)     NULL,
+  `user_id`       bigint unsigned DEFAULT NULL,
+  `username`      varchar(64)     NOT NULL DEFAULT '',
+  `action`        varchar(64)     NOT NULL,
+  `resource_type` varchar(64)     NOT NULL,
+  `resource_id`   bigint unsigned DEFAULT NULL,
+  `resource_name` varchar(256)    DEFAULT NULL,
+  `detail`        text            DEFAULT NULL,
+  `ip`            varchar(64)     DEFAULT NULL,
+  `status`        varchar(16)     NOT NULL DEFAULT 'success',
+  PRIMARY KEY (`id`),
+  KEY `idx_audit_logs_deleted_at`    (`deleted_at`),
+  KEY `idx_audit_logs_user_id`       (`user_id`),
+  KEY `idx_audit_logs_action`        (`action`),
+  KEY `idx_audit_logs_resource_type` (`resource_type`),
+  KEY `idx_audit_logs_created_at`    (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci

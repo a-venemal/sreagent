@@ -39,6 +39,7 @@ type Handlers struct {
 	BizGroup         *handler.BizGroupHandler
 	AlertChannel     *handler.AlertChannelHandler
 	UserNotifyConfig *handler.UserNotifyConfigHandler
+	AuditLog         *handler.AuditLogHandler
 }
 
 // Setup initializes the Gin router with all routes and middleware.
@@ -118,6 +119,7 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 				ds.PUT("/:id", adminOnly, handlers.DataSource.Update)
 				ds.DELETE("/:id", adminOnly, handlers.DataSource.Delete)
 				ds.POST("/:id/health-check", manage, handlers.DataSource.HealthCheck)
+				ds.POST("/:id/query", manage, handlers.DataSource.Query)
 			}
 
 			// Alert Rules
@@ -125,6 +127,7 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 			{
 				rules.GET("", handlers.AlertRule.List)
 				rules.GET("/:id", handlers.AlertRule.Get)
+				rules.GET("/categories", handlers.AlertRule.ListCategories)
 				rules.GET("/export", handlers.AlertRule.Export)
 				rules.POST("", manage, handlers.AlertRule.Create)
 				rules.PUT("/:id", manage, handlers.AlertRule.Update)
@@ -344,9 +347,15 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 				auth.GET("/engine/status", handlers.Engine.GetStatus)
 			}
 
+			// Audit Logs — admin only
+			auth.GET("/audit-logs", adminOnly, handlers.AuditLog.List)
+
 			// Dashboard — all authenticated users
 			auth.GET("/dashboard/stats", handlers.Dashboard.GetStats)
 			auth.GET("/dashboard/mtta-mttr", handlers.Dashboard.GetMTTRStats)
+			auth.GET("/dashboard/alert-trend", handlers.Dashboard.GetAlertTrend)
+			auth.GET("/dashboard/top-rules", handlers.Dashboard.GetTopRules)
+			auth.GET("/dashboard/severity-history", handlers.Dashboard.GetSeverityHistory)
 		}
 	}
 

@@ -11,11 +11,16 @@ import (
 )
 
 type AlertEventHandler struct {
-	svc *service.AlertEventService
+	svc      *service.AlertEventService
+	auditSvc *service.AuditLogService
 }
 
 func NewAlertEventHandler(svc *service.AlertEventService) *AlertEventHandler {
 	return &AlertEventHandler{svc: svc}
+}
+
+func (h *AlertEventHandler) SetAuditService(svc *service.AuditLogService) {
+	h.auditSvc = svc
 }
 
 // List returns paginated alert events with optional filters.
@@ -81,6 +86,13 @@ func (h *AlertEventHandler) Acknowledge(c *gin.Context) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		h.auditSvc.Record(&model.AuditLog{
+			UserID: &userID, Username: GetCurrentUsername(c),
+			Action: model.AuditActionAck, ResourceType: model.AuditResourceAlertEvent,
+			ResourceID: &id, IP: c.ClientIP(),
+		})
+	}
 	Success(c, nil)
 }
 
@@ -107,6 +119,13 @@ func (h *AlertEventHandler) Assign(c *gin.Context) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		h.auditSvc.Record(&model.AuditLog{
+			UserID: &operatorID, Username: GetCurrentUsername(c),
+			Action: model.AuditActionAssign, ResourceType: model.AuditResourceAlertEvent,
+			ResourceID: &id, IP: c.ClientIP(),
+		})
+	}
 	Success(c, nil)
 }
 
@@ -129,6 +148,13 @@ func (h *AlertEventHandler) Resolve(c *gin.Context) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		h.auditSvc.Record(&model.AuditLog{
+			UserID: &userID, Username: GetCurrentUsername(c),
+			Action: model.AuditActionResolve, ResourceType: model.AuditResourceAlertEvent,
+			ResourceID: &id, IP: c.ClientIP(),
+		})
+	}
 	Success(c, nil)
 }
 
@@ -151,6 +177,13 @@ func (h *AlertEventHandler) Close(c *gin.Context) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		h.auditSvc.Record(&model.AuditLog{
+			UserID: &userID, Username: GetCurrentUsername(c),
+			Action: model.AuditActionClose, ResourceType: model.AuditResourceAlertEvent,
+			ResourceID: &id, IP: c.ClientIP(),
+		})
+	}
 	Success(c, nil)
 }
 
@@ -219,6 +252,13 @@ func (h *AlertEventHandler) Silence(c *gin.Context) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		h.auditSvc.Record(&model.AuditLog{
+			UserID: &userID, Username: GetCurrentUsername(c),
+			Action: model.AuditActionSilence, ResourceType: model.AuditResourceAlertEvent,
+			ResourceID: &id, IP: c.ClientIP(),
+		})
+	}
 	Success(c, nil)
 }
 
@@ -239,6 +279,13 @@ func (h *AlertEventHandler) BatchAcknowledge(c *gin.Context) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		h.auditSvc.Record(&model.AuditLog{
+			UserID: &userID, Username: GetCurrentUsername(c),
+			Action: model.AuditActionAck, ResourceType: model.AuditResourceAlertEvent,
+			Detail: "batch", IP: c.ClientIP(),
+		})
+	}
 	Success(c, gin.H{"success": success, "failed": failed})
 }
 
@@ -259,6 +306,13 @@ func (h *AlertEventHandler) BatchClose(c *gin.Context) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		h.auditSvc.Record(&model.AuditLog{
+			UserID: &userID, Username: GetCurrentUsername(c),
+			Action: model.AuditActionClose, ResourceType: model.AuditResourceAlertEvent,
+			Detail: "batch", IP: c.ClientIP(),
+		})
+	}
 	Success(c, gin.H{"success": success, "failed": failed})
 }
 

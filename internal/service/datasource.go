@@ -126,3 +126,66 @@ func (s *DataSourceService) HealthCheck(ctx context.Context, id uint) (model.Dat
 
 	return status, nil
 }
+
+// QueryResponse holds the result of a datasource query test.
+type QueryResponse struct {
+	ResultType string            `json:"result_type"`
+	Series     []QuerySeriesItem `json:"series"`
+	RawCount   int               `json:"raw_count"`
+}
+
+// QuerySeriesItem represents a single series in the query response.
+type QuerySeriesItem struct {
+	Labels map[string]string `json:"labels"`
+	Values []QueryDataPoint  `json:"values"`
+}
+
+// QueryDataPoint represents a single data point in a series.
+type QueryDataPoint struct {
+	Timestamp int64   `json:"ts"`
+	Value     float64 `json:"value"`
+}
+
+// QueryDatasource executes an expression against the given datasource for testing.
+func (s *DataSourceService) QueryDatasource(ctx context.Context, dsID uint, expression string) (*QueryResponse, error) {
+	ds, err := s.repo.GetByID(ctx, dsID)
+	if err != nil {
+		return nil, apperr.ErrDSNotFound
+	}
+
+	qc := datasource.NewQueryClient()
+	resp := &QueryResponse{}
+
+	switch ds.Type {
+	case model.DSTypePrometheus, model.DSTypeVictoriaMetrics:
+		results, err := qc.InstantQuery(ctx, ds.Endpoint, ds.AuthType, ds.AuthConfig, expression)
+		if err != nil {
+			return nil, apperr.WithMessage(apperr.ErrExternalAPI, err.Error())
+		}
+		resp.ResultType = "vector"
+		for _, r := range results {
+			item := QuerySeriesItem{Labels: r.Labels}
+			for _, v := range r.Values {
+				item.Values = append(item.Values, QueryDataPoint{Timestamp: v.Timestamp.UnixMilli(), Value: v.Value})
+			}
+			resp.Series = append(resp.Series, item)
+		}
+	case model.DSTypeVictoriaLogs:
+		results, err := datasource.VictoriaLogsInstantQuery(ctx, ds.Endpoint, ds.AuthType, ds.AuthConfig, expression)
+		if err != nil {
+			return nil, apperr.WithMessage(apperr.ErrExternalAPI, err.Error())
+		}
+		resp.ResultType = "logs"
+		if len(results) > 0 && len(results[0].Values) > 0 {
+			resp.RawCount = int(results[0].Values[0].Value)
+		}
+	default:
+		return nil, apperr.WithMessage(apperr.ErrInvalidParam, "expression testing not supported for "+string(ds.Type))
+	}
+
+	// Limit series count
+	if len(resp.Series) > 100 {
+		resp.Series = resp.Series[:100]
+	}
+	return resp, nil
+}

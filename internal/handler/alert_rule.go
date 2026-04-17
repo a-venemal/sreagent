@@ -16,11 +16,16 @@ import (
 )
 
 type AlertRuleHandler struct {
-	svc *service.AlertRuleService
+	svc      *service.AlertRuleService
+	auditSvc *service.AuditLogService
 }
 
 func NewAlertRuleHandler(svc *service.AlertRuleService) *AlertRuleHandler {
 	return &AlertRuleHandler{svc: svc}
+}
+
+func (h *AlertRuleHandler) SetAuditService(svc *service.AuditLogService) {
+	h.auditSvc = svc
 }
 
 type CreateAlertRuleRequest struct {
@@ -34,6 +39,7 @@ type CreateAlertRuleRequest struct {
 	Labels       model.JSONLabels    `json:"labels"`
 	Annotations  model.JSONLabels    `json:"annotations"`
 	GroupName    string              `json:"group_name"`
+	Category     string              `json:"category"`
 }
 
 func (h *AlertRuleHandler) Create(c *gin.Context) {
@@ -54,6 +60,7 @@ func (h *AlertRuleHandler) Create(c *gin.Context) {
 		Labels:       req.Labels,
 		Annotations:  req.Annotations,
 		GroupName:    req.GroupName,
+		Category:     req.Category,
 		Status:       model.RuleStatusEnabled,
 		CreatedBy:    GetCurrentUserID(c),
 	}
@@ -63,6 +70,14 @@ func (h *AlertRuleHandler) Create(c *gin.Context) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		uid := rule.CreatedBy
+		h.auditSvc.Record(&model.AuditLog{
+			UserID: &uid, Username: GetCurrentUsername(c),
+			Action: model.AuditActionCreate, ResourceType: model.AuditResourceAlertRule,
+			ResourceID: &rule.ID, ResourceName: rule.Name, IP: c.ClientIP(),
+		})
+	}
 	Success(c, rule)
 }
 
@@ -87,8 +102,9 @@ func (h *AlertRuleHandler) List(c *gin.Context) {
 	severity := c.Query("severity")
 	status := c.Query("status")
 	groupName := c.Query("group_name")
+	category := c.Query("category")
 
-	list, total, err := h.svc.List(c.Request.Context(), severity, status, groupName, pq.Page, pq.PageSize)
+	list, total, err := h.svc.List(c.Request.Context(), severity, status, groupName, category, pq.Page, pq.PageSize)
 	if err != nil {
 		Error(c, err)
 		return
@@ -121,6 +137,7 @@ func (h *AlertRuleHandler) Update(c *gin.Context) {
 		Labels:       req.Labels,
 		Annotations:  req.Annotations,
 		GroupName:    req.GroupName,
+		Category:     req.Category,
 		UpdatedBy:    GetCurrentUserID(c),
 	}
 	rule.ID = id
@@ -130,6 +147,14 @@ func (h *AlertRuleHandler) Update(c *gin.Context) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		uid := rule.UpdatedBy
+		h.auditSvc.Record(&model.AuditLog{
+			UserID: &uid, Username: GetCurrentUsername(c),
+			Action: model.AuditActionUpdate, ResourceType: model.AuditResourceAlertRule,
+			ResourceID: &rule.ID, ResourceName: rule.Name, IP: c.ClientIP(),
+		})
+	}
 	Success(c, rule)
 }
 
@@ -145,6 +170,14 @@ func (h *AlertRuleHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		uid := GetCurrentUserID(c)
+		h.auditSvc.Record(&model.AuditLog{
+			UserID: &uid, Username: GetCurrentUsername(c),
+			Action: model.AuditActionDelete, ResourceType: model.AuditResourceAlertRule,
+			ResourceID: &id, IP: c.ClientIP(),
+		})
+	}
 	Success(c, nil)
 }
 
@@ -238,12 +271,24 @@ func (h *AlertRuleHandler) Import(c *gin.Context) {
 	})
 }
 
-// Export exports alert rules as a Prometheus-compatible YAML file.
+// ListCategories returns all distinct category values.
+func (h *AlertRuleHandler) ListCategories(c *gin.Context) {
+	categories, err := h.svc.ListCategories(c.Request.Context())
+	if err != nil {
+		Error(c, err)
+		return
+	}
+	Success(c, categories)
+}
+
+// Export exports alert rules as a Prometheus-compatible YAML or JSON file.
 func (h *AlertRuleHandler) Export(c *gin.Context) {
 	groupName := c.Query("group_name")
+	category := c.Query("category")
+	format := c.Query("format")
 
 	// Fetch all rules (using a large page size to get all)
-	list, _, err := h.svc.List(c.Request.Context(), "", "", groupName, 1, 10000)
+	list, _, err := h.svc.List(c.Request.Context(), "", "", groupName, category, 1, 10000)
 	if err != nil {
 		Error(c, err)
 		return
@@ -273,6 +318,17 @@ func (h *AlertRuleHandler) Export(c *gin.Context) {
 			Name:  name,
 			Rules: rules,
 		})
+	}
+
+	if format == "json" {
+		data, err := json.Marshal(&ruleFile)
+		if err != nil {
+			ErrorWithMessage(c, 50001, "failed to marshal rules: "+err.Error())
+			return
+		}
+		c.Header("Content-Disposition", "attachment; filename=alert_rules.json")
+		c.Data(http.StatusOK, "application/json", data)
+		return
 	}
 
 	data, err := yaml.Marshal(&ruleFile)
@@ -306,5 +362,13 @@ func (h *AlertRuleHandler) ToggleStatus(c *gin.Context) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		uid := GetCurrentUserID(c)
+		h.auditSvc.Record(&model.AuditLog{
+			UserID: &uid, Username: GetCurrentUsername(c),
+			Action: model.AuditActionToggle, ResourceType: model.AuditResourceAlertRule,
+			ResourceID: &id, Detail: string(req.Status), IP: c.ClientIP(),
+		})
+	}
 	Success(c, nil)
 }

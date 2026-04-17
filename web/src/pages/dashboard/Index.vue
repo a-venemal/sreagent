@@ -5,14 +5,15 @@ import { useMessage, NTag } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
-import { PieChart, GaugeChart } from 'echarts/charts'
+import { PieChart, GaugeChart, LineChart, BarChart } from 'echarts/charts'
 import {
   TooltipComponent,
   LegendComponent,
+  GridComponent,
 } from 'echarts/components'
 import VChart from 'vue-echarts'
 import { dashboardApi, alertEventApi, engineApi } from '@/api'
-import type { DashboardStats, MTTRStats, AlertEvent, EngineStatus } from '@/types'
+import type { DashboardStats, MTTRStats, AlertEvent, EngineStatus, AlertTrendPoint, TopRuleItem } from '@/types'
 import { formatTime } from '@/utils/format'
 import { getSeverityType, getEventStatusType } from '@/utils/alert'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -27,7 +28,7 @@ import {
   LayersOutline,
 } from '@vicons/ionicons5'
 
-use([CanvasRenderer, PieChart, GaugeChart, TooltipComponent, LegendComponent])
+use([CanvasRenderer, PieChart, GaugeChart, LineChart, BarChart, TooltipComponent, LegendComponent, GridComponent])
 
 const router = useRouter()
 const message = useMessage()
@@ -70,6 +71,18 @@ const mttrStats = ref<MTTRStats>({
   acked_count: 0,
   resolved_count: 0,
 })
+
+const trendData = ref<AlertTrendPoint[]>([])
+const topRules = ref<TopRuleItem[]>([])
+const trendDays = ref(30)
+const trendLoading = ref(false)
+
+const trendDayOptions = [
+  { label: () => t('dashboard.last7d'), value: 7 },
+  { label: () => t('dashboard.last14d'), value: 14 },
+  { label: () => t('dashboard.last30d'), value: 30 },
+  { label: () => t('dashboard.last90d'), value: 90 },
+]
 
 const statCards = [
   { titleKey: 'dashboard.activeAlerts', key: 'active_alerts' as const, icon: AlertCircleOutline, color: '#e88080', gradient: 'linear-gradient(135deg, #e88080, #c0392b)' },
@@ -251,6 +264,52 @@ async function fetchMTTRStats() {
   }
 }
 
+const trendChartOption = computed(() => ({
+  backgroundColor: 'transparent',
+  tooltip: { trigger: 'axis' },
+  legend: { data: [t('dashboard.fired'), t('dashboard.resolved')], textStyle: { color: '#aaa' } },
+  grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+  xAxis: { type: 'category', data: trendData.value.map(d => d.date), axisLabel: { color: '#888' }, axisLine: { lineStyle: { color: '#333' } } },
+  yAxis: { type: 'value', axisLabel: { color: '#888' }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } } },
+  series: [
+    { name: t('dashboard.fired'), type: 'line', smooth: true, data: trendData.value.map(d => d.fired_count),
+      lineStyle: { color: '#e88080', width: 2 }, itemStyle: { color: '#e88080' },
+      areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(232,128,128,0.3)' }, { offset: 1, color: 'rgba(232,128,128,0.02)' }] } } },
+    { name: t('dashboard.resolved'), type: 'line', smooth: true, data: trendData.value.map(d => d.resolved_count),
+      lineStyle: { color: '#18a058', width: 2 }, itemStyle: { color: '#18a058' },
+      areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(24,160,88,0.3)' }, { offset: 1, color: 'rgba(24,160,88,0.02)' }] } } },
+  ],
+}))
+
+const topRulesChartOption = computed(() => ({
+  backgroundColor: 'transparent',
+  tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+  grid: { left: '3%', right: '10%', bottom: '3%', top: '3%', containLabel: true },
+  xAxis: { type: 'value', axisLabel: { color: '#888' }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } } },
+  yAxis: { type: 'category', data: topRules.value.map(r => r.alert_name).reverse(), axisLabel: { color: '#aaa', fontSize: 11, width: 120, overflow: 'truncate' } },
+  series: [{
+    type: 'bar', data: topRules.value.map(r => r.count).reverse(),
+    itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#e8808033' }, { offset: 1, color: '#e88080' }] }, borderRadius: [0, 4, 4, 0] },
+    barMaxWidth: 20,
+  }],
+}))
+
+async function fetchTrendData() {
+  trendLoading.value = true
+  try {
+    const [trendRes, topRes] = await Promise.all([
+      dashboardApi.getAlertTrend(trendDays.value),
+      dashboardApi.getTopRules(trendDays.value, 10),
+    ])
+    trendData.value = trendRes.data.data || []
+    topRules.value = topRes.data.data || []
+  } catch {
+    // non-critical
+  } finally {
+    trendLoading.value = false
+  }
+}
+
 async function fetchRecentAlerts() {
   eventsLoading.value = true
   try {
@@ -268,6 +327,7 @@ onMounted(() => {
   fetchEngineStatus()
   fetchRecentAlerts()
   fetchMTTRStats()
+  fetchTrendData()
 })
 </script>
 
@@ -405,6 +465,35 @@ onMounted(() => {
         </div>
       </n-gi>
     </n-grid>
+
+    <!-- Trend Charts Row -->
+    <div class="trend-header">
+      <n-radio-group v-model:value="trendDays" size="small" @update:value="fetchTrendData">
+        <n-radio-button v-for="opt in trendDayOptions" :key="opt.value" :value="opt.value">
+          {{ opt.label() }}
+        </n-radio-button>
+      </n-radio-group>
+    </div>
+    <n-spin :show="trendLoading">
+      <n-grid :x-gap="16" :y-gap="16" :cols="12" style="margin-bottom: 20px">
+        <n-gi :span="8">
+          <div class="panel-card">
+            <div class="panel-card__header">
+              <span class="panel-card__title">{{ t('dashboard.alertTrend') }}</span>
+            </div>
+            <v-chart :option="trendChartOption" autoresize style="height: 300px" />
+          </div>
+        </n-gi>
+        <n-gi :span="4">
+          <div class="panel-card">
+            <div class="panel-card__header">
+              <span class="panel-card__title">{{ t('dashboard.topRules') }}</span>
+            </div>
+            <v-chart :option="topRulesChartOption" autoresize style="height: 300px" />
+          </div>
+        </n-gi>
+      </n-grid>
+    </n-spin>
 
     <!-- Recent Alerts Table -->
     <div class="panel-card">
@@ -625,6 +714,13 @@ onMounted(() => {
   font-weight: 700;
   color: var(--sre-text-primary);
   line-height: 1;
+}
+
+/* ===== Trend header ===== */
+.trend-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
 }
 
 /* ===== Alert table link ===== */

@@ -91,3 +91,13 @@ func GetCurrentUserID(c *gin.Context) uint {
 	}
 	return 0
 }
+
+// GetCurrentUsername gets the authenticated user's username from context.
+func GetCurrentUsername(c *gin.Context) string {
+	if v, exists := c.Get("username"); exists {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}

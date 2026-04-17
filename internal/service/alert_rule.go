@@ -52,8 +52,13 @@ func (s *AlertRuleService) GetByID(ctx context.Context, id uint) (*model.AlertRu
 	return rule, nil
 }
 
-func (s *AlertRuleService) List(ctx context.Context, severity, status, groupName string, page, pageSize int) ([]model.AlertRule, int64, error) {
-	return s.repo.List(ctx, severity, status, groupName, page, pageSize)
+func (s *AlertRuleService) List(ctx context.Context, severity, status, groupName, category string, page, pageSize int) ([]model.AlertRule, int64, error) {
+	return s.repo.List(ctx, severity, status, groupName, category, page, pageSize)
+}
+
+// ListCategories returns all distinct non-empty category values.
+func (s *AlertRuleService) ListCategories(ctx context.Context) ([]string, error) {
+	return s.repo.ListCategories(ctx)
 }
 
 func (s *AlertRuleService) Update(ctx context.Context, rule *model.AlertRule) error {
@@ -72,6 +77,7 @@ func (s *AlertRuleService) Update(ctx context.Context, rule *model.AlertRule) er
 	existing.Labels = rule.Labels
 	existing.Annotations = rule.Annotations
 	existing.GroupName = rule.GroupName
+	existing.Category = rule.Category
 	existing.UpdatedBy = rule.UpdatedBy
 	existing.EvalInterval = rule.EvalInterval
 	existing.RecoveryHold = rule.RecoveryHold

@@ -109,6 +109,9 @@ func main() {
 	subscribeRuleRepo := repository.NewSubscribeRuleRepository(db)
 	bizGroupRepo := repository.NewBizGroupRepository(db)
 
+	// Audit log repository
+	auditLogRepo := repository.NewAuditLogRepository(db)
+
 	// Dispatch repositories
 	alertChannelRepo := repository.NewAlertChannelRepository(db)
 	userNotifyConfigRepo := repository.NewUserNotifyConfigRepository(db)
@@ -141,6 +144,9 @@ func main() {
 	)
 	subscribeRuleSvc := service.NewSubscribeRuleService(subscribeRuleRepo, zapLogger)
 	bizGroupSvc := service.NewBizGroupService(bizGroupRepo, zapLogger)
+
+	// Audit log service
+	auditLogSvc := service.NewAuditLogService(auditLogRepo, zapLogger)
 
 	// Dispatch services
 	alertChannelSvc := service.NewAlertChannelService(alertChannelRepo, zapLogger)
@@ -345,7 +351,13 @@ func main() {
 		BizGroup:         handler.NewBizGroupHandler(bizGroupSvc),
 		AlertChannel:     handler.NewAlertChannelHandler(alertChannelSvc),
 		UserNotifyConfig: handler.NewUserNotifyConfigHandler(userNotifyConfigSvc),
+		AuditLog:         handler.NewAuditLogHandler(auditLogSvc),
 	}
+
+	// Inject audit service into handlers that support it
+	handlers.AlertRule.SetAuditService(auditLogSvc)
+	handlers.AlertEvent.SetAuditService(auditLogSvc)
+	handlers.User.SetAuditService(auditLogSvc)
 
 	// Setup router
 	r := router.Setup(cfg, handlers, zapLogger)
@@ -473,6 +485,9 @@ func autoMigrate(db *gorm.DB) error {
 		&model.NotifyRecord{},
 		&model.MuteRule{},
 	}
+
+	// Audit log
+	models = append(models, &model.AuditLog{})
 
 	// Phase 2 notification v2 models
 	models = append(models, model.NotificationV2Models()...)

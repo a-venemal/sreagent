@@ -3,12 +3,12 @@ import { h, ref, reactive, onMounted, computed } from 'vue'
 import { useMessage, NTag, NButton, NSpace, NPopconfirm } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { alertRuleApi, datasourceApi } from '@/api'
-import type { AlertRule, DataSource, AlertSeverity } from '@/types'
+import type { AlertRule, DataSource, AlertSeverity, QueryResponse } from '@/types'
 import { formatTime, kvArrayToRecord } from '@/utils/format'
 import { getSeverityType, getRuleStatusType } from '@/utils/alert'
 import KVEditor from '@/components/common/KVEditor.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
-import { AddOutline, RefreshOutline } from '@vicons/ionicons5'
+import { AddOutline, RefreshOutline, CloudUploadOutline, CloudDownloadOutline, PlayOutline, FunnelOutline } from '@vicons/ionicons5'
 
 const message = useMessage()
 const { t } = useI18n()
@@ -17,6 +17,31 @@ const rules = ref<AlertRule[]>([])
 const total = ref(0)
 const page = ref(1)
 const datasources = ref<DataSource[]>([])
+
+// Category state
+const activeCategory = ref('')
+const categories = ref<string[]>([])
+
+// Expression test state
+const queryTesting = ref(false)
+const queryResult = ref<QueryResponse | null>(null)
+
+// Import/Export state
+const showImportExport = ref(false)
+const importFile = ref<File | null>(null)
+const importDatasourceId = ref<number | null>(null)
+const importing = ref(false)
+const exportFormat = ref('yaml')
+const exportCategory = ref('')
+
+const categoryOptions = [
+  { label: () => t('alert.categoryNode'), value: 'node' },
+  { label: () => t('alert.categoryDatabase'), value: 'database' },
+  { label: () => t('alert.categoryMiddleware'), value: 'middleware' },
+  { label: () => t('alert.categoryNetwork'), value: 'network' },
+  { label: () => t('alert.categoryApplication'), value: 'application' },
+  { label: () => t('alert.categoryCustom'), value: 'custom' },
+]
 
 // Modal state
 const showModal = ref(false)
@@ -35,6 +60,7 @@ const defaultForm = {
   labels: [] as { key: string; value: string }[],
   annotations: [] as { key: string; value: string }[],
   group_name: '',
+  category: '',
 }
 
 const form = reactive({ ...defaultForm })
@@ -84,6 +110,15 @@ const columns = [
     key: 'group_name',
     width: 120,
     ellipsis: { tooltip: true },
+  },
+  {
+    title: () => t('alert.category'),
+    key: 'category',
+    width: 110,
+    render: (row: AlertRule) =>
+      row.category
+        ? h(NTag, { size: 'small', round: true, bordered: false, type: 'info' }, { default: () => row.category })
+        : h('span', { style: 'color: var(--sre-text-secondary); font-size: 12px' }, '-'),
   },
   {
     title: () => t('alert.severity'),
@@ -144,7 +179,9 @@ const columns = [
 async function fetchRules() {
   loading.value = true
   try {
-    const { data } = await alertRuleApi.list({ page: page.value, page_size: 50 })
+    const params: Record<string, any> = { page: page.value, page_size: 50 }
+    if (activeCategory.value) params.category = activeCategory.value
+    const { data } = await alertRuleApi.list(params)
     rules.value = data.data.list || []
     total.value = data.data.total
   } catch (err: any) {
@@ -152,6 +189,21 @@ async function fetchRules() {
   } finally {
     loading.value = false
   }
+}
+
+async function fetchCategories() {
+  try {
+    const { data } = await alertRuleApi.listCategories()
+    categories.value = data.data || []
+  } catch {
+    // silently fail
+  }
+}
+
+function handleCategoryChange(cat: string) {
+  activeCategory.value = cat
+  page.value = 1
+  fetchRules()
 }
 
 async function fetchDatasources() {
@@ -177,7 +229,9 @@ function openCreate() {
     labels: [],
     annotations: [],
     group_name: '',
+    category: '',
   })
+  queryResult.value = null
   showModal.value = true
 }
 
@@ -195,7 +249,9 @@ function openEdit(rule: AlertRule) {
     labels: Object.entries(rule.labels || {}).map(([key, value]) => ({ key, value })),
     annotations: Object.entries(rule.annotations || {}).map(([key, value]) => ({ key, value })),
     group_name: rule.group_name,
+    category: rule.category || '',
   })
+  queryResult.value = null
   showModal.value = true
 }
 
@@ -222,6 +278,7 @@ async function handleSave() {
       labels: kvArrayToRecord(form.labels),
       annotations: kvArrayToRecord(form.annotations),
       group_name: form.group_name,
+      category: form.category,
     }
 
     if (editingId.value) {
@@ -261,9 +318,62 @@ async function handleDelete(id: number) {
   }
 }
 
+async function handleTestExpression() {
+  if (!form.datasource_id || !form.expression.trim()) return
+  queryTesting.value = true
+  queryResult.value = null
+  try {
+    const { data } = await datasourceApi.query(form.datasource_id, { expression: form.expression })
+    queryResult.value = data.data
+  } catch (err: any) {
+    message.error(err.message || 'Query failed')
+  } finally {
+    queryTesting.value = false
+  }
+}
+
+async function handleImport() {
+  if (!importFile.value) return
+  importing.value = true
+  try {
+    const { data } = await alertRuleApi.importRules(importFile.value, importDatasourceId.value || undefined)
+    const result = data.data
+    message.success(t('alert.rulesImported', { success: result.success, total: result.total }))
+    if (result.errors && result.errors.length > 0) {
+      message.warning(result.errors.join('\n'))
+    }
+    showImportExport.value = false
+    importFile.value = null
+    fetchRules()
+    fetchCategories()
+  } catch (err: any) {
+    message.error(err.message)
+  } finally {
+    importing.value = false
+  }
+}
+
+async function handleExport() {
+  try {
+    const params: Record<string, string> = { format: exportFormat.value }
+    if (exportCategory.value) params.category = exportCategory.value
+    const response = await alertRuleApi.exportRules(params)
+    const blob = new Blob([response.data as any])
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `alert-rules.${exportFormat.value}`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (err: any) {
+    message.error(err.message)
+  }
+}
+
 onMounted(() => {
   fetchRules()
   fetchDatasources()
+  fetchCategories()
 })
 </script>
 
@@ -271,6 +381,10 @@ onMounted(() => {
   <div class="rules-page">
     <PageHeader :title="t('alert.rules')" :subtitle="t('alert.rulesSubtitle')">
       <template #actions>
+        <n-button @click="showImportExport = true">
+          <template #icon><n-icon :component="FunnelOutline" /></template>
+          {{ t('alert.importExport') }}
+        </n-button>
         <n-button @click="fetchRules" :loading="loading">
           <template #icon><n-icon :component="RefreshOutline" /></template>
           {{ t('common.refresh') }}
@@ -281,6 +395,29 @@ onMounted(() => {
         </n-button>
       </template>
     </PageHeader>
+
+    <!-- Category Tabs -->
+    <div class="category-tabs">
+      <n-button
+        :type="activeCategory === '' ? 'primary' : 'default'"
+        size="small"
+        @click="handleCategoryChange('')"
+        :quaternary="activeCategory !== ''"
+      >
+        {{ t('alert.allCategories') }}
+        <template #icon v-if="activeCategory === ''"><n-icon :component="FunnelOutline" /></template>
+      </n-button>
+      <n-button
+        v-for="cat in categories"
+        :key="cat"
+        :type="activeCategory === cat ? 'primary' : 'default'"
+        size="small"
+        @click="handleCategoryChange(cat)"
+        :quaternary="activeCategory !== cat"
+      >
+        {{ cat }}
+      </n-button>
+    </div>
 
     <n-card :bordered="false" style="background: var(--sre-bg-card); border-radius: 12px">
       <n-data-table
@@ -337,6 +474,17 @@ onMounted(() => {
           </n-gi>
         </n-grid>
 
+        <n-form-item :label="t('alert.category')">
+          <n-select
+            v-model:value="form.category"
+            :options="categoryOptions"
+            :placeholder="t('alert.selectCategory')"
+            clearable
+            tag
+            filterable
+          />
+        </n-form-item>
+
         <n-form-item required>
           <template #label>
             <n-space size="small" align="center" style="gap:6px">
@@ -346,13 +494,50 @@ onMounted(() => {
               </n-tag>
             </n-space>
           </template>
-          <n-input
-            v-model:value="form.expression"
-            type="textarea"
-            :placeholder="expressionPlaceholder"
-            :rows="3"
-            style="font-family: monospace"
-          />
+          <div style="width: 100%">
+            <n-input
+              v-model:value="form.expression"
+              type="textarea"
+              :placeholder="expressionPlaceholder"
+              :rows="3"
+              style="font-family: monospace"
+            />
+            <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px">
+              <n-button
+                size="small"
+                :loading="queryTesting"
+                :disabled="!form.datasource_id || !form.expression.trim()"
+                @click="handleTestExpression"
+              >
+                <template #icon><n-icon :component="PlayOutline" /></template>
+                {{ queryTesting ? t('alert.testing') : t('alert.testExpression') }}
+              </n-button>
+            </div>
+            <n-collapse-transition :show="queryResult !== null">
+              <div class="query-result">
+                <div class="query-result__header">{{ t('alert.testResult') }}</div>
+                <div v-if="queryResult?.result_type === 'logs'" style="font-size: 13px; color: var(--sre-text-secondary)">
+                  {{ t('alert.matchedLogs') }}: {{ queryResult.raw_count }}
+                </div>
+                <div v-else-if="queryResult?.series && queryResult.series.length > 0">
+                  <n-data-table
+                    :columns="[
+                      { title: 'Labels', key: 'labels', render: (row: any) => Object.entries(row.labels || {}).map(([k, v]: any) => `${k}=${v}`).join(', ') },
+                      { title: 'Value', key: 'value', width: 120, render: (row: any) => row.values?.[0]?.value ?? '-' },
+                    ]"
+                    :data="queryResult.series"
+                    :bordered="false"
+                    size="small"
+                    :pagination="false"
+                    :max-height="200"
+                  />
+                </div>
+                <div v-else style="font-size: 13px; color: var(--sre-text-secondary); padding: 8px 0">
+                  {{ t('alert.noResults') }}
+                </div>
+              </div>
+            </n-collapse-transition>
+          </div>
         </n-form-item>
 
         <n-grid :x-gap="12" :cols="2">
@@ -388,11 +573,104 @@ onMounted(() => {
         </n-space>
       </template>
     </n-modal>
+
+    <!-- Import/Export Drawer -->
+    <n-drawer v-model:show="showImportExport" :width="480" placement="right">
+      <n-drawer-content :title="t('alert.importExport')">
+        <n-tabs type="line">
+          <n-tab-pane name="import" :tab="t('alert.importFile')">
+            <n-space vertical size="large">
+              <n-upload
+                :max="1"
+                accept=".yaml,.yml,.json"
+                :default-upload="false"
+                @change="({ file }: any) => { importFile = file?.file || null }"
+              >
+                <n-upload-dragger>
+                  <div style="padding: 20px; text-align: center">
+                    <n-icon :component="CloudUploadOutline" :size="36" style="color: var(--sre-text-secondary)" />
+                    <div style="margin-top: 8px; color: var(--sre-text-secondary); font-size: 13px">
+                      {{ t('alert.dragOrClick') }}
+                    </div>
+                  </div>
+                </n-upload-dragger>
+              </n-upload>
+              <n-form-item :label="t('alert.dataSource')">
+                <n-select
+                  v-model:value="importDatasourceId"
+                  :options="datasourceOptions"
+                  :placeholder="t('alert.selectDataSource')"
+                  clearable
+                />
+              </n-form-item>
+              <n-button
+                type="primary"
+                block
+                :loading="importing"
+                :disabled="!importFile"
+                @click="handleImport"
+              >
+                {{ t('alert.importFile') }}
+              </n-button>
+            </n-space>
+          </n-tab-pane>
+          <n-tab-pane name="export" :tab="t('alert.exportRules')">
+            <n-space vertical size="large">
+              <n-form-item :label="t('alert.exportFormat')">
+                <n-radio-group v-model:value="exportFormat">
+                  <n-radio-button value="yaml">YAML</n-radio-button>
+                  <n-radio-button value="json">JSON</n-radio-button>
+                </n-radio-group>
+              </n-form-item>
+              <n-form-item :label="t('alert.category')">
+                <n-select
+                  v-model:value="exportCategory"
+                  :options="[{ label: t('alert.allCategories'), value: '' }, ...categories.map(c => ({ label: c, value: c }))]"
+                  :placeholder="t('alert.selectCategory')"
+                />
+              </n-form-item>
+              <n-button
+                type="primary"
+                block
+                @click="handleExport"
+              >
+                <template #icon><n-icon :component="CloudDownloadOutline" /></template>
+                {{ t('alert.exportRules') }}
+              </n-button>
+            </n-space>
+          </n-tab-pane>
+        </n-tabs>
+      </n-drawer-content>
+    </n-drawer>
   </div>
 </template>
 
 <style scoped>
 .rules-page {
   max-width: 1400px;
+}
+
+.category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.query-result {
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.query-result__header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sre-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
 }
 </style>

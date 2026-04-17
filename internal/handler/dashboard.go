@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"sort"
 	"strconv"
 	"time"
 
@@ -159,4 +160,143 @@ func (h *DashboardHandler) GetMTTRStats(c *gin.Context) {
 	}
 
 	Success(c, stats)
+}
+
+// AlertTrendPoint represents a data point for the alert trend chart.
+type AlertTrendPoint struct {
+	Date          string `json:"date"`
+	FiredCount    int64  `json:"fired_count"`
+	ResolvedCount int64  `json:"resolved_count"`
+}
+
+// GetAlertTrend returns daily fired/resolved counts for trend charts.
+// GET /api/v1/dashboard/alert-trend?days=30
+func (h *DashboardHandler) GetAlertTrend(c *gin.Context) {
+	days := 30
+	if v := c.Query("days"); v != "" {
+		if n, _ := strconv.Atoi(v); n > 0 && n <= 365 {
+			days = n
+		}
+	}
+	since := time.Now().AddDate(0, 0, -days)
+
+	type dateCount struct {
+		Date string
+		Cnt  int64
+	}
+
+	// Query fired counts per day
+	var firedRows []dateCount
+	h.db.Model(&model.AlertEvent{}).
+		Select("DATE(fired_at) AS date, COUNT(*) AS cnt").
+		Where("fired_at >= ? AND deleted_at IS NULL", since).
+		Group("DATE(fired_at)").Order("date").Scan(&firedRows)
+
+	// Query resolved counts per day
+	var resolvedRows []dateCount
+	h.db.Model(&model.AlertEvent{}).
+		Select("DATE(resolved_at) AS date, COUNT(*) AS cnt").
+		Where("resolved_at >= ? AND resolved_at IS NOT NULL AND deleted_at IS NULL", since).
+		Group("DATE(resolved_at)").Order("date").Scan(&resolvedRows)
+
+	// Merge into result
+	resolvedMap := map[string]int64{}
+	for _, r := range resolvedRows {
+		resolvedMap[r.Date] = r.Cnt
+	}
+
+	result := make([]AlertTrendPoint, 0, len(firedRows))
+	for _, f := range firedRows {
+		result = append(result, AlertTrendPoint{
+			Date: f.Date, FiredCount: f.Cnt, ResolvedCount: resolvedMap[f.Date],
+		})
+	}
+	Success(c, result)
+}
+
+// TopRuleItem represents a rule with its alert count for the top-rules endpoint.
+type TopRuleItem struct {
+	RuleID    *uint  `json:"rule_id"`
+	AlertName string `json:"alert_name"`
+	Count     int64  `json:"count"`
+}
+
+// GetTopRules returns the most frequently firing alert rules.
+// GET /api/v1/dashboard/top-rules?days=30&limit=10
+func (h *DashboardHandler) GetTopRules(c *gin.Context) {
+	days := 30
+	if v := c.Query("days"); v != "" {
+		if n, _ := strconv.Atoi(v); n > 0 {
+			days = n
+		}
+	}
+	limit := 10
+	if v := c.Query("limit"); v != "" {
+		if n, _ := strconv.Atoi(v); n > 0 && n <= 50 {
+			limit = n
+		}
+	}
+	since := time.Now().AddDate(0, 0, -days)
+
+	var items []TopRuleItem
+	h.db.Model(&model.AlertEvent{}).
+		Select("rule_id, alert_name, COUNT(*) AS count").
+		Where("fired_at >= ? AND deleted_at IS NULL", since).
+		Group("rule_id, alert_name").
+		Order("count DESC").
+		Limit(limit).
+		Scan(&items)
+	Success(c, items)
+}
+
+// SeverityHistoryPoint represents per-severity alert counts for a single day.
+type SeverityHistoryPoint struct {
+	Date   string         `json:"date"`
+	Counts map[string]int64 `json:"counts"`
+}
+
+// GetSeverityHistory returns daily alert counts broken down by severity.
+// GET /api/v1/dashboard/severity-history?days=30
+func (h *DashboardHandler) GetSeverityHistory(c *gin.Context) {
+	days := 30
+	if v := c.Query("days"); v != "" {
+		if n, _ := strconv.Atoi(v); n > 0 {
+			days = n
+		}
+	}
+	since := time.Now().AddDate(0, 0, -days)
+
+	type row struct {
+		Date     string
+		Severity string
+		Cnt      int64
+	}
+	var rows []row
+	h.db.Model(&model.AlertEvent{}).
+		Select("DATE(fired_at) AS date, severity, COUNT(*) AS cnt").
+		Where("fired_at >= ? AND deleted_at IS NULL", since).
+		Group("DATE(fired_at), severity").
+		Order("date").
+		Scan(&rows)
+
+	dateMap := map[string]map[string]int64{}
+	for _, r := range rows {
+		if dateMap[r.Date] == nil {
+			dateMap[r.Date] = map[string]int64{"critical": 0, "warning": 0, "info": 0}
+		}
+		dateMap[r.Date][r.Severity] = r.Cnt
+	}
+
+	// Sort dates
+	dates := make([]string, 0, len(dateMap))
+	for d := range dateMap {
+		dates = append(dates, d)
+	}
+	sort.Strings(dates)
+
+	result := make([]SeverityHistoryPoint, 0, len(dates))
+	for _, d := range dates {
+		result = append(result, SeverityHistoryPoint{Date: d, Counts: dateMap[d]})
+	}
+	Success(c, result)
 }

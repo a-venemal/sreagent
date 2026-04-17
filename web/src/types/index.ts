@@ -77,6 +77,7 @@ export interface AlertRule {
   annotations: Record<string, string>
   status: AlertRuleStatus
   group_name: string
+  category: string
   version: number
   created_by: number
   updated_by: number
@@ -398,4 +399,47 @@ export interface MTTRStats {
   mttr_seconds: number
   acked_count: number
   resolved_count: number
+}
+
+// ===== Audit Log =====
+export interface AuditLog {
+  id: number
+  user_id: number | null
+  username: string
+  action: string
+  resource_type: string
+  resource_id: number | null
+  resource_name: string
+  detail: string
+  ip: string
+  status: 'success' | 'failed'
+  created_at: string
+}
+
+// ===== Dashboard Analytics =====
+export interface AlertTrendPoint {
+  date: string
+  fired_count: number
+  resolved_count: number
+}
+
+export interface TopRuleItem {
+  rule_id: number | null
+  alert_name: string
+  count: number
+}
+
+export interface SeverityHistoryPoint {
+  date: string
+  counts: Record<string, number>
+}
+
+// ===== Expression Test =====
+export interface QueryResponse {
+  result_type: 'vector' | 'matrix' | 'logs'
+  series: Array<{
+    labels: Record<string, string>
+    values: Array<{ ts: number; value: number }>
+  }>
+  raw_count: number
 }
