@@ -170,6 +170,15 @@ async function handleUserDropdown(key: string) {
 const userInitial  = computed(() => (authStore.user?.display_name || authStore.user?.username || 'U').charAt(0).toUpperCase())
 const displayName  = computed(() => authStore.user?.display_name || authStore.user?.username || 'User')
 
+// True when the saved avatar is an uploaded image (data: URL or http(s) URL),
+// false for emoji presets / empty values.
+function isImageAvatar(v: string | undefined | null): boolean {
+  if (!v) return false
+  return v.startsWith('data:image/') || v.startsWith('http://') || v.startsWith('https://') || v.startsWith('/')
+}
+const headerAvatar = computed(() => authStore.user?.avatar || '')
+const headerAvatarIsImage = computed(() => isImageAvatar(headerAvatar.value))
+
 // ===== Breadcrumb =====
 const pageTitle = computed(() => {
   const p = route.path
@@ -199,8 +208,44 @@ const profileSaving = ref(false)
 // Tab: Basic info
 const profileForm = ref({ display_name: '', email: '', phone: '', avatar: '' })
 
-// Preset avatars (emoji-based, no upload server needed for MVP)
-const presetAvatars = ['👤','🧑‍💻','👩‍💻','🧑‍🔧','👩‍🔧','🧑‍🚀','👩‍🚀','🦊','🐺','🐧','🦅','🦁']
+// Preset avatars (emoji-based, stored as plain text).
+// For custom images we store a base64 data: URL in the same `avatar` column.
+const presetAvatars = [
+  '👤','🧑‍💻','👩‍💻','🧑‍🔧','👩‍🔧','🧑‍🚀','👩‍🚀','🧑‍🔬','👩‍🔬',
+  '🧑‍💼','👩‍💼','🧑‍🎤','🧑‍🎨','🦊','🐺','🐧','🦅','🦁','🐯','🐻',
+  '🐼','🦉','🦄','🐉','🤖','👾','🛰️','🚀','⚡','🔥','🌟','🌈',
+]
+
+// Custom upload: base64-encoded data URL, capped at 200 KB.
+const AVATAR_MAX_BYTES = 200 * 1024
+const avatarFileInput = ref<HTMLInputElement | null>(null)
+
+function triggerAvatarUpload() {
+  avatarFileInput.value?.click()
+}
+
+function onAvatarFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  if (!/^image\/(png|jpe?g|svg\+xml|webp)$/.test(file.type)) {
+    message.error(t('profile.avatarInvalidType'))
+    input.value = ''
+    return
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    message.error(t('profile.avatarTooLarge'))
+    input.value = ''
+    return
+  }
+  const reader = new FileReader()
+  reader.onload = () => {
+    profileForm.value.avatar = String(reader.result || '')
+  }
+  reader.onerror = () => message.error(t('common.failed'))
+  reader.readAsDataURL(file)
+  input.value = ''
+}
 
 // Tab: Change password
 const pwdForm = ref({ old_password: '', new_password: '', confirm_password: '' })
@@ -330,7 +375,7 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
       :native-scrollbar="false"
     >
       <div class="sider-logo" :class="{ collapsed }">
-        <div class="logo-mark">S</div>
+        <img src="/logo.svg" alt="SREAgent" class="logo-mark" />
         <transition name="fade">
           <span v-if="!collapsed" class="logo-text">
             <span class="gradient-text">SRE</span>Agent
@@ -350,7 +395,7 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
       />
 
       <div v-if="!collapsed" class="sider-footer">
-        <span class="eyebrow">v1.3.0</span>
+        <span class="eyebrow">v1.3.1</span>
       </div>
     </n-layout-sider>
 
@@ -436,7 +481,11 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
           <!-- ④ User -->
           <n-dropdown :options="userDropdownOptions" trigger="click" @select="handleUserDropdown">
             <div class="user-pill">
-              <div class="user-avatar">{{ userInitial }}</div>
+              <div class="user-avatar" :class="{ 'user-avatar--image': headerAvatarIsImage, 'user-avatar--emoji': !!headerAvatar && !headerAvatarIsImage }">
+                <img v-if="headerAvatarIsImage" :src="headerAvatar" alt="avatar" />
+                <template v-else-if="headerAvatar">{{ headerAvatar }}</template>
+                <template v-else>{{ userInitial }}</template>
+              </div>
               <span class="user-name">{{ displayName }}</span>
               <n-icon :component="ChevronDownOutline" :size="12" class="user-chevron" />
             </div>
@@ -472,16 +521,40 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
         <!-- Avatar selector -->
         <div class="avatar-section">
           <div class="avatar-current">
-            <span class="avatar-preview">{{ profileForm.avatar || userInitial }}</span>
+            <img v-if="isImageAvatar(profileForm.avatar)" :src="profileForm.avatar" alt="avatar" class="avatar-preview-img" />
+            <span v-else class="avatar-preview">{{ profileForm.avatar || userInitial }}</span>
           </div>
-          <div class="avatar-grid">
-            <span
-              v-for="a in presetAvatars"
-              :key="a"
-              class="avatar-option"
-              :class="{ selected: profileForm.avatar === a }"
-              @click="profileForm.avatar = a"
-            >{{ a }}</span>
+          <div class="avatar-actions">
+            <div class="avatar-grid">
+              <span
+                v-for="a in presetAvatars"
+                :key="a"
+                class="avatar-option"
+                :class="{ selected: profileForm.avatar === a }"
+                @click="profileForm.avatar = a"
+              >{{ a }}</span>
+            </div>
+            <div class="avatar-upload-row">
+              <n-button size="tiny" secondary @click="triggerAvatarUpload">
+                📎 {{ t('profile.uploadAvatar') }}
+              </n-button>
+              <n-button
+                v-if="profileForm.avatar"
+                size="tiny"
+                quaternary
+                type="error"
+                @click="profileForm.avatar = ''"
+              >
+                {{ t('profile.clearAvatar') }}
+              </n-button>
+              <input
+                ref="avatarFileInput"
+                type="file"
+                accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                style="display: none"
+                @change="onAvatarFileChange"
+              />
+            </div>
           </div>
         </div>
 
@@ -595,28 +668,10 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
   width: 32px;
   height: 32px;
   border-radius: var(--sre-radius-md);
-  background: var(--sre-gradient-brand);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: var(--sre-fw-bold);
-  font-size: 16px;
-  color: #fff;
   flex-shrink: 0;
-  box-shadow: 0 4px 14px -4px rgba(24, 160, 88, 0.55),
-              inset 0 1px 0 rgba(255,255,255,0.15);
-  letter-spacing: -0.02em;
+  display: block;
+  filter: drop-shadow(0 4px 14px rgba(24, 160, 88, 0.45));
   position: relative;
-}
-.logo-mark::after {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  border-radius: var(--sre-radius-md);
-  background: var(--sre-gradient-brand);
-  filter: blur(12px);
-  opacity: 0.35;
-  z-index: -1;
 }
 .logo-text {
   font-size: var(--sre-fs-xl);
@@ -867,8 +922,26 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  overflow: hidden;
   box-shadow: 0 2px 8px -2px rgba(24, 160, 88, 0.45),
               inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.user-avatar--emoji {
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--sre-border);
+}
+.user-avatar--image {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--sre-border);
+}
+.user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .user-name {
   font-size: var(--sre-fs-md);
@@ -891,23 +964,43 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 
 /* ===== Profile Modal ===== */
-.avatar-section { display: flex; align-items: center; gap: 16px; padding: 12px 0 4px; }
+.avatar-section { display: flex; align-items: flex-start; gap: 16px; padding: 12px 0 4px; }
 .avatar-current {
-  width: 52px; height: 52px; border-radius: 14px; font-size: 28px;
+  width: 60px; height: 60px; border-radius: 14px; font-size: 30px;
   background: linear-gradient(135deg, rgba(24,160,88,0.12), rgba(112,192,232,0.12));
   border: 2px solid rgba(24,160,88,0.2);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  overflow: hidden;
 }
-.avatar-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.avatar-preview-img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.avatar-actions {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
+  gap: 6px;
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 2px;
+}
 .avatar-option {
-  width: 34px; height: 34px; border-radius: 8px; font-size: 18px;
+  width: 32px; height: 32px; border-radius: 8px; font-size: 17px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; border: 2px solid transparent;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color 0.2s, background 0.2s, transform 0.15s;
   background: rgba(128,128,128,0.06);
 }
-.avatar-option:hover { background: rgba(128,128,128,0.12); }
-.avatar-option.selected { border-color: var(--sre-primary); background: rgba(24,160,88,0.08); }
+.avatar-option:hover { background: rgba(128,128,128,0.12); transform: translateY(-1px); }
+.avatar-option.selected { border-color: var(--sre-primary); background: rgba(24,160,88,0.10); }
+.avatar-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .modal-footer {
   display: flex; justify-content: flex-end;
   padding-top: 16px; margin-top: 4px;

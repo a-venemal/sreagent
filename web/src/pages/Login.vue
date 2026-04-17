@@ -103,6 +103,7 @@ onMounted(() => {
 
     <div class="login-card" :class="{ light: !isDark }">
       <div class="login-header">
+        <img src="/logo.svg" alt="SREAgent" class="login-logo" />
         <h1 class="logo-text">
           <span class="gradient-text">SRE</span><span class="agent-text" :class="{ light: !isDark }">Agent</span>
         </h1>
@@ -258,6 +259,14 @@ onMounted(() => {
 .login-header {
   text-align: center;
   margin-bottom: 40px;
+}
+
+.login-logo {
+  width: 56px;
+  height: 56px;
+  display: block;
+  margin: 0 auto 14px;
+  filter: drop-shadow(0 8px 24px rgba(24, 160, 88, 0.45));
 }
 
 .logo-text {

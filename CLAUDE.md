@@ -2,7 +2,7 @@
 
 > 本文件供 Claude Code / AI Vibe Coding 工具在新会话时快速接手项目，无需重新探索代码库。
 > 同步来源：`.opencode/context.md`（OpenCode 生成）+ 代码审阅。
-> **最后更新：2026-04-16**
+> **最后更新：2026-04-17（当前 tag: v1.3.1）**
 
 ---
 
@@ -206,19 +206,32 @@ Engine fires
 
 ---
 
+## 最近发布（Release Log）
+
+| Tag | 主要内容 |
+|-----|---------|
+| **v1.3.1** | MTTA/MTTR 升级：P50/P95 百分位、按严重程度细分、MTTA/MTTR 每日趋势折线图；品牌 logo.svg（sider/login/favicon 统一）；个人信息头像扩展为 32 个预设 emoji + 自定义上传（≤200KB，base64 data URL）；修复顶部栏保存头像后仍显示用户名首字母的 bug；GitHub Actions 收敛为 linux/amd64 单架构 + `latest`+`v<tag>` 双标签 |
+| v1.3.0 | 设计系统级视觉翻新：CSS token（品牌色阶、间距、阴影、motion/typography）+ Naive UI GlobalThemeOverrides（dark + light）+ 侧栏/顶栏/登录页玻璃态皮肤 |
+| v1.2.0 | 告警规则分类 tab、仪表盘分析图表（趋势 + Top 规则）、操作审计日志、表达式实时测试 |
+| v1.1.x | 告警详情页改版（严重等级横幅 + 生命周期时间线）、通知模块合并为单页 Tabs |
+| v1.0.x | OIDC 配置 UI（存 DB）、K8s 清单、多数据源集成、RBAC 三级权限 |
+
+---
+
 ## 产品功能缺口（待开发）
 
 | 功能 | 优先级 | 难度 | 状态/说明 |
 |------|:------:|:----:|---------|
-| MTTR/MTTA 统计 | 高 | 简单 | `fired_at`/`acked_at`/`resolved_at` 字段全有，只需加聚合查询和前端展示 |
 | 升级策略执行（target=user/team） | 高 | 中等 | `EscalationExecutor` 已跑，缺口在 `escalation_executor.go:194`：step 无 channel 时只打日志不发通知；需注入 `UserNotifyConfigRepo`+`ScheduleService` 补 user/team 分支 |
 | Lark 卡片状态更新 | 高 | 较难 | 需 Bot API（非 Webhook）+ migration 加 `lark_message_id` 字段 + 状态变更时 PATCH `/im/v1/messages/{id}/patch`；凭据已在 DB |
-| Lark Bot 指令（@机器人） | 中 | 中等 | 框架存在，指令未完整实现 |
-| 告警降噪/聚合 | 中 | 较难 | 未实现 |
-| 操作审计日志 | 中 | 简单 | 未实现 |
-| 告警统计报表 | 低 | 中等 | 未实现 |
+| Lark Bot 指令（@机器人） | 中 | 中等 | 框架存在，指令未完整实现（ack / resolve / assign 快捷命令尚未接线） |
+| 告警降噪/聚合 | 中 | 较难 | 未实现；建议按 `labels + fingerprint prefix` 做时间窗口合并 |
+| 告警统计报表 | 中 | 中等 | 仅有仪表盘实时看板，未做周/月趋势导出（PDF/CSV） |
+| 头像后端大小校验 | 中 | 简单 | 当前仅前端限制 200KB data URL，`auth.UpdateMe` 未在 Go 层校验 `avatar` 长度 |
+| 告警静默窗口预览 | 中 | 中等 | 已有 MuteRule 规则，但无 "未来 24h 将被静默的告警" 的可视化 |
 | SOP 知识库 | 低 | 较难 | 未实现 |
-| 多租户隔离 | 低 | 很难 | 未实现 |
+| 多租户隔离 | 低 | 很难 | 未实现（目前 BizGroup 只作为告警作用域标签，非硬隔离） |
+| JWT refresh token | 低 | 简单 | 目前 JWT 24h 过期需重新登录，无 refresh endpoint |
 
 ---
 

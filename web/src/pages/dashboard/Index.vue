@@ -13,7 +13,7 @@ import {
 } from 'echarts/components'
 import VChart from 'vue-echarts'
 import { dashboardApi, alertEventApi, engineApi } from '@/api'
-import type { DashboardStats, MTTRStats, AlertEvent, EngineStatus, AlertTrendPoint, TopRuleItem } from '@/types'
+import type { DashboardStats, MTTRStats, MTTRTrendPoint, AlertEvent, EngineStatus, AlertTrendPoint, TopRuleItem } from '@/types'
 import { formatTime } from '@/utils/format'
 import { getSeverityType, getEventStatusType } from '@/utils/alert'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -64,13 +64,33 @@ const mttrWindowOptions = [
   { label: '30d', value: 720 },
 ]
 const mttrWindow = ref(24)
+
+const emptyMetric = { mean: -1, p50: -1, p95: -1, count: 0 }
 const mttrStats = ref<MTTRStats>({
   window_hours: 24,
+  mtta: { ...emptyMetric },
+  mttr: { ...emptyMetric },
+  by_severity: [
+    { severity: 'critical', mtta: { ...emptyMetric }, mttr: { ...emptyMetric } },
+    { severity: 'warning',  mtta: { ...emptyMetric }, mttr: { ...emptyMetric } },
+    { severity: 'info',     mtta: { ...emptyMetric }, mttr: { ...emptyMetric } },
+  ],
+  // legacy mirrors — still populated by the server, referenced by older code paths
   mtta_seconds: -1,
   mttr_seconds: -1,
   acked_count: 0,
   resolved_count: 0,
 })
+
+const mttrTrend = ref<MTTRTrendPoint[]>([])
+const mttrTrendLoading = ref(false)
+const mttrTrendDays = ref(30)
+const mttrTrendDayOptions = [
+  { label: () => t('dashboard.last7d'),  value: 7 },
+  { label: () => t('dashboard.last14d'), value: 14 },
+  { label: () => t('dashboard.last30d'), value: 30 },
+  { label: () => t('dashboard.last90d'), value: 90 },
+]
 
 const trendData = ref<AlertTrendPoint[]>([])
 const topRules = ref<TopRuleItem[]>([])
@@ -129,54 +149,84 @@ const severityChartOption = computed(() => ({
   }],
 }))
 
-// ECharts: MTTA gauge
-const mttaGaugeOption = computed(() => {
-  const val = mttrStats.value.mtta_seconds
-  const display = formatDuration(val)
-  return makeGaugeOption(display, '#18a058', val >= 0)
-})
+// Duration formatter shortcut — `-1` means "no data" and renders as a dash.
+function fmtDuration(seconds: number): string {
+  return seconds < 0 ? '—' : formatDuration(seconds)
+}
 
-const mttrGaugeOption = computed(() => {
-  const val = mttrStats.value.mttr_seconds
-  const display = formatDuration(val)
-  return makeGaugeOption(display, '#70c0e8', val >= 0)
-})
+function sevLabel(sev: string): string {
+  const key = `alert.${sev}`
+  return t(key) || sev
+}
 
-function makeGaugeOption(label: string, color: string, hasData: boolean) {
+// ECharts: MTTR trend (daily means for MTTA + MTTR)
+const mttrTrendChartOption = computed(() => {
+  const dates = mttrTrend.value.map(p => p.date)
+  // ECharts draws gaps automatically when we use `null` instead of a negative sentinel.
+  const asMinutes = (s: number) => (s < 0 ? null : +(s / 60).toFixed(1))
   return {
     backgroundColor: 'transparent',
-    series: [{
-      type: 'gauge',
-      radius: '85%',
-      startAngle: 210,
-      endAngle: -30,
-      min: 0,
-      max: 100,
-      splitNumber: 0,
-      progress: {
-        show: hasData,
-        width: 10,
-        itemStyle: { color },
-      },
-      axisLine: {
-        lineStyle: { width: 10, color: [[1, 'rgba(255,255,255,0.08)']] },
-      },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(0,0,0,0.75)',
+      borderColor: 'transparent',
+      textStyle: { color: '#fff', fontSize: 12 },
+      valueFormatter: (v: number | null) => v == null ? '—' : `${v} min`,
+    },
+    legend: {
+      data: ['MTTA', 'MTTR'],
+      textStyle: { color: '#888', fontSize: 11 },
+      itemWidth: 12,
+      itemHeight: 2,
+      right: 0,
+      top: 0,
+    },
+    grid: { left: '2%', right: '2%', bottom: '6%', top: '18%', containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: dates,
+      axisLabel: { color: '#888', fontSize: 10 },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
       axisTick: { show: false },
-      splitLine: { show: false },
-      axisLabel: { show: false },
-      pointer: { show: false },
-      detail: {
-        show: true,
-        offsetCenter: [0, '10%'],
-        formatter: label,
-        fontSize: hasData ? 20 : 16,
-        fontWeight: 'bold',
-        color: hasData ? '#e8e8e8' : '#555',
+    },
+    yAxis: {
+      type: 'value',
+      name: 'min',
+      nameTextStyle: { color: '#666', fontSize: 10 },
+      axisLabel: { color: '#888', fontSize: 10 },
+      axisLine: { show: false },
+      axisTick: { show: false },
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } },
+    },
+    series: [
+      {
+        name: 'MTTA',
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 6,
+        data: mttrTrend.value.map(p => asMinutes(p.mtta_seconds)),
+        connectNulls: false,
+        lineStyle: { color: '#f59e0b', width: 2 },
+        itemStyle: { color: '#f59e0b' },
       },
-      data: [{ value: hasData ? 50 : 0 }],
-    }],
+      {
+        name: 'MTTR',
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 6,
+        data: mttrTrend.value.map(p => asMinutes(p.mttr_seconds)),
+        connectNulls: false,
+        lineStyle: { color: '#18a058', width: 2 },
+        itemStyle: { color: '#18a058' },
+        areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [
+          { offset: 0, color: 'rgba(24,160,88,0.18)' }, { offset: 1, color: 'rgba(24,160,88,0.01)' }
+        ] } },
+      },
+    ],
   }
-}
+})
 
 const alertColumns = [
   {
@@ -264,6 +314,18 @@ async function fetchMTTRStats() {
   }
 }
 
+async function fetchMTTRTrend() {
+  mttrTrendLoading.value = true
+  try {
+    const { data } = await dashboardApi.getMTTRTrend(mttrTrendDays.value)
+    mttrTrend.value = data.data || []
+  } catch {
+    // non-critical
+  } finally {
+    mttrTrendLoading.value = false
+  }
+}
+
 const trendChartOption = computed(() => ({
   backgroundColor: 'transparent',
   tooltip: { trigger: 'axis' },
@@ -327,6 +389,7 @@ onMounted(() => {
   fetchEngineStatus()
   fetchRecentAlerts()
   fetchMTTRStats()
+  fetchMTTRTrend()
   fetchTrendData()
 })
 </script>
@@ -409,12 +472,12 @@ onMounted(() => {
         </div>
       </n-gi>
 
-      <!-- MTTA/MTTR gauges -->
+      <!-- MTTA/MTTR analytics: P50 hero + mean/P95 + severity breakdown -->
       <n-gi :span="5">
-        <div class="panel-card" style="height:100%">
-          <div class="panel-card__header" style="justify-content:space-between">
-            <div style="display:flex;align-items:center;gap:6px">
-              <n-icon :component="TimeOutline" size="15" style="color:#aaa" />
+        <div class="panel-card mttr-card">
+          <div class="panel-card__header mttr-card__header">
+            <div class="mttr-card__title-row">
+              <n-icon :component="TimeOutline" size="15" />
               <span class="panel-card__title">MTTA / MTTR</span>
             </div>
             <n-radio-group v-model:value="mttrWindow" size="small" @update:value="fetchMTTRStats">
@@ -423,18 +486,58 @@ onMounted(() => {
               </n-radio-button>
             </n-radio-group>
           </div>
+
           <n-spin :show="mttrLoading">
-            <div class="gauge-row">
-              <div class="gauge-item">
-                <v-chart :option="mttaGaugeOption" autoresize style="height:140px" />
-                <div class="gauge-label">MTTA</div>
-                <div class="gauge-sub">{{ mttrStats.acked_count }} {{ t('dashboard.ackedCount') }}</div>
+            <!-- Two hero blocks: MTTA + MTTR, each with P50 + mean/P95 + count -->
+            <div class="mttr-hero">
+              <div class="mttr-metric mttr-metric--ack">
+                <div class="mttr-metric__eyebrow">MTTA · P50</div>
+                <div class="mttr-metric__value number-display">{{ fmtDuration(mttrStats.mtta.p50) }}</div>
+                <div class="mttr-metric__subs">
+                  <span class="mttr-metric__sub"><em>mean</em> {{ fmtDuration(mttrStats.mtta.mean) }}</span>
+                  <span class="mttr-metric__dot">·</span>
+                  <span class="mttr-metric__sub"><em>P95</em> {{ fmtDuration(mttrStats.mtta.p95) }}</span>
+                </div>
+                <div class="mttr-metric__count">
+                  <span class="number-display">{{ mttrStats.mtta.count }}</span> {{ t('dashboard.ackedCount') }}
+                </div>
               </div>
-              <div class="gauge-divider" />
-              <div class="gauge-item">
-                <v-chart :option="mttrGaugeOption" autoresize style="height:140px" />
-                <div class="gauge-label">MTTR</div>
-                <div class="gauge-sub">{{ mttrStats.resolved_count }} {{ t('dashboard.resolvedCount') }}</div>
+
+              <div class="mttr-hero__divider" />
+
+              <div class="mttr-metric mttr-metric--resolve">
+                <div class="mttr-metric__eyebrow">MTTR · P50</div>
+                <div class="mttr-metric__value number-display">{{ fmtDuration(mttrStats.mttr.p50) }}</div>
+                <div class="mttr-metric__subs">
+                  <span class="mttr-metric__sub"><em>mean</em> {{ fmtDuration(mttrStats.mttr.mean) }}</span>
+                  <span class="mttr-metric__dot">·</span>
+                  <span class="mttr-metric__sub"><em>P95</em> {{ fmtDuration(mttrStats.mttr.p95) }}</span>
+                </div>
+                <div class="mttr-metric__count">
+                  <span class="number-display">{{ mttrStats.mttr.count }}</span> {{ t('dashboard.resolvedCount') }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Per-severity breakdown strip -->
+            <div class="mttr-sev">
+              <div class="mttr-sev__head eyebrow">{{ t('dashboard.bySeverity') }}</div>
+              <div
+                v-for="sev in mttrStats.by_severity"
+                :key="sev.severity"
+                class="mttr-sev__row"
+                :class="`mttr-sev__row--${sev.severity}`"
+              >
+                <span class="mttr-sev__tag">{{ sevLabel(sev.severity) }}</span>
+                <div class="mttr-sev__metric">
+                  <span class="mttr-sev__label">MTTA</span>
+                  <span class="mttr-sev__val number-display">{{ fmtDuration(sev.mtta.mean) }}</span>
+                </div>
+                <div class="mttr-sev__metric">
+                  <span class="mttr-sev__label">MTTR</span>
+                  <span class="mttr-sev__val number-display">{{ fmtDuration(sev.mttr.mean) }}</span>
+                </div>
+                <div class="mttr-sev__count number-display">{{ sev.mttr.count }}</div>
               </div>
             </div>
           </n-spin>
@@ -462,6 +565,28 @@ onMounted(() => {
               <div class="mini-stat-value">{{ stats.total_teams }}</div>
             </div>
           </div>
+        </div>
+      </n-gi>
+    </n-grid>
+
+    <!-- MTTR Trend full-width card -->
+    <n-grid :x-gap="16" :y-gap="16" :cols="12" style="margin-bottom: 20px">
+      <n-gi :span="12">
+        <div class="panel-card">
+          <div class="panel-card__header" style="justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:6px">
+              <n-icon :component="TimeOutline" size="15" />
+              <span class="panel-card__title">{{ t('dashboard.mttrTrend') }}</span>
+            </div>
+            <n-radio-group v-model:value="mttrTrendDays" size="small" @update:value="fetchMTTRTrend">
+              <n-radio-button v-for="opt in mttrTrendDayOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label() }}
+              </n-radio-button>
+            </n-radio-group>
+          </div>
+          <n-spin :show="mttrTrendLoading">
+            <v-chart :option="mttrTrendChartOption" autoresize style="height: 260px" />
+          </n-spin>
         </div>
       </n-gi>
     </n-grid>
@@ -695,6 +820,152 @@ onMounted(() => {
   color: var(--sre-text-primary);
   font-family: var(--sre-font-mono);
   font-feature-settings: "tnum" 1;
+}
+
+/* ===== MTTR card ===== */
+.mttr-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.mttr-card__header {
+  justify-content: space-between;
+  gap: var(--sre-space-3);
+  flex-wrap: wrap;
+}
+.mttr-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sre-space-2);
+  color: var(--sre-text-tertiary);
+}
+.mttr-hero {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: var(--sre-space-2) 0 var(--sre-space-4);
+}
+.mttr-hero__divider {
+  width: 1px;
+  background: var(--sre-border);
+  margin: 0 var(--sre-space-4);
+  align-self: stretch;
+  opacity: 0.6;
+}
+.mttr-metric {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.mttr-metric__eyebrow {
+  font-size: var(--sre-fs-2xs);
+  font-weight: var(--sre-fw-semibold);
+  color: var(--sre-text-tertiary);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.mttr-metric__value {
+  font-size: var(--sre-fs-2xl);
+  font-weight: var(--sre-fw-bold);
+  color: var(--sre-text-primary);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  margin-top: 2px;
+}
+.mttr-metric--ack .mttr-metric__value { color: var(--sre-warning); }
+.mttr-metric--resolve .mttr-metric__value { color: var(--sre-brand-500); }
+.mttr-metric__subs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--sre-fs-xs);
+  color: var(--sre-text-secondary);
+  flex-wrap: wrap;
+}
+.mttr-metric__sub em {
+  font-style: normal;
+  color: var(--sre-text-tertiary);
+  font-size: var(--sre-fs-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-right: 3px;
+}
+.mttr-metric__dot {
+  color: var(--sre-text-tertiary);
+  opacity: 0.5;
+}
+.mttr-metric__count {
+  font-size: var(--sre-fs-xs);
+  color: var(--sre-text-tertiary);
+  margin-top: 2px;
+}
+.mttr-metric__count .number-display {
+  color: var(--sre-text-secondary);
+  font-weight: var(--sre-fw-semibold);
+  margin-right: 4px;
+}
+
+/* ===== MTTR per-severity strip ===== */
+.mttr-sev {
+  margin-top: auto;
+  padding-top: var(--sre-space-3);
+  border-top: 1px dashed var(--sre-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mttr-sev__head {
+  font-size: var(--sre-fs-2xs);
+  font-weight: var(--sre-fw-semibold);
+  color: var(--sre-text-tertiary);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.mttr-sev__row {
+  display: grid;
+  grid-template-columns: 64px 1fr 1fr 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: var(--sre-radius-sm);
+  background: var(--sre-bg-sunken);
+  font-size: var(--sre-fs-xs);
+  border-left: 2px solid transparent;
+}
+.mttr-sev__row--critical { border-left-color: var(--sre-critical); }
+.mttr-sev__row--warning  { border-left-color: var(--sre-warning); }
+.mttr-sev__row--info     { border-left-color: var(--sre-info); }
+.mttr-sev__tag {
+  font-weight: var(--sre-fw-semibold);
+  color: var(--sre-text-primary);
+  font-size: var(--sre-fs-xs);
+  text-transform: capitalize;
+}
+.mttr-sev__metric {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+.mttr-sev__label {
+  font-size: var(--sre-fs-2xs);
+  color: var(--sre-text-tertiary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.mttr-sev__val {
+  color: var(--sre-text-secondary);
+  font-weight: var(--sre-fw-semibold);
+  font-size: var(--sre-fs-xs);
+}
+.mttr-sev__count {
+  text-align: right;
+  color: var(--sre-text-tertiary);
+  font-size: var(--sre-fs-xs);
+  font-weight: var(--sre-fw-semibold);
 }
 
 /* ===== Gauge ===== */

@@ -353,6 +353,7 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 			// Dashboard — all authenticated users
 			auth.GET("/dashboard/stats", handlers.Dashboard.GetStats)
 			auth.GET("/dashboard/mtta-mttr", handlers.Dashboard.GetMTTRStats)
+			auth.GET("/dashboard/mttr-trend", handlers.Dashboard.GetMTTRTrend)
 			auth.GET("/dashboard/alert-trend", handlers.Dashboard.GetAlertTrend)
 			auth.GET("/dashboard/top-rules", handlers.Dashboard.GetTopRules)
 			auth.GET("/dashboard/severity-history", handlers.Dashboard.GetSeverityHistory)
@@ -364,7 +365,7 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 	if _, err := os.Stat(distPath); err == nil {
 		r.Static("/assets", path.Join(distPath, "assets"))
 		r.StaticFile("/favicon.ico", path.Join(distPath, "favicon.ico"))
-		r.StaticFile("/vite.svg", path.Join(distPath, "vite.svg"))
+		r.StaticFile("/logo.svg", path.Join(distPath, "logo.svg"))
 
 		r.NoRoute(func(c *gin.Context) {
 			reqPath := c.Request.URL.Path

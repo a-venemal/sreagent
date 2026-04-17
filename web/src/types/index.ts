@@ -391,11 +391,44 @@ export interface DashboardStats {
   severity_breakdown: { critical: number; warning: number; info: number }
 }
 
+/** Single latency metric: mean + percentiles. -1 means "no data". */
+export interface MTTRMetric {
+  mean: number
+  p50: number
+  p95: number
+  count: number
+}
+
+export interface SeverityMTTR {
+  severity: 'critical' | 'warning' | 'info' | string
+  mtta: MTTRMetric
+  mttr: MTTRMetric
+}
+
 export interface MTTRStats {
   window_hours: number
-  /** Mean time to acknowledge in seconds, -1 if no data */
+  /** Overall MTTA across all severities */
+  mtta: MTTRMetric
+  /** Overall MTTR across all severities */
+  mttr: MTTRMetric
+  /** Per-severity breakdown, ordered critical → warning → info */
+  by_severity: SeverityMTTR[]
+
+  // --- Legacy mirrors kept for backward compat with older UI builds ---
+  /** @deprecated use mtta.mean */
   mtta_seconds: number
-  /** Mean time to resolve in seconds, -1 if no data */
+  /** @deprecated use mttr.mean */
+  mttr_seconds: number
+  /** @deprecated use mtta.count */
+  acked_count: number
+  /** @deprecated use mttr.count */
+  resolved_count: number
+}
+
+/** One day of MTTA/MTTR means for the trend chart. */
+export interface MTTRTrendPoint {
+  date: string
+  mtta_seconds: number
   mttr_seconds: number
   acked_count: number
   resolved_count: number

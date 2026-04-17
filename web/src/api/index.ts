@@ -19,6 +19,7 @@ import type {
   EscalationStep,
   DashboardStats,
   MTTRStats,
+  MTTRTrendPoint,
   MuteRule,
   NotifyRule,
   NotifyMedia,
@@ -451,6 +452,8 @@ export const dashboardApi = {
     request.get<ApiResponse<DashboardStats>>('/dashboard/stats'),
   getMTTRStats: (hours = 24) =>
     request.get<ApiResponse<MTTRStats>>('/dashboard/mtta-mttr', { params: { hours } }),
+  getMTTRTrend: (days = 30) =>
+    request.get<ApiResponse<MTTRTrendPoint[]>>('/dashboard/mttr-trend', { params: { days } }),
   getAlertTrend: (days = 30) =>
     request.get<ApiResponse<AlertTrendPoint[]>>('/dashboard/alert-trend', { params: { days } }),
   getTopRules: (days = 30, limit = 10) =>

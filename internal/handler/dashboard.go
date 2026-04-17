@@ -101,22 +101,88 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 	Success(c, stats)
 }
 
-// MTTRStats holds mean time to acknowledge and mean time to resolve, in seconds.
-type MTTRStats struct {
-	// Window is the query window in hours.
-	WindowHours int `json:"window_hours"`
-	// MTTA is the mean time to acknowledge in seconds (-1 if no data).
-	MTTA float64 `json:"mtta_seconds"`
-	// MTTR is the mean time to resolve in seconds (-1 if no data).
-	MTTR float64 `json:"mttr_seconds"`
-	// AckedCount is the number of acknowledged events in the window.
-	AckedCount int64 `json:"acked_count"`
-	// ResolvedCount is the number of resolved events in the window.
-	ResolvedCount int64 `json:"resolved_count"`
+// MTTRMetric holds the mean, P50, and P95 of a latency distribution.
+// All values are seconds; -1 means "no data in window".
+type MTTRMetric struct {
+	Mean  float64 `json:"mean"`
+	P50   float64 `json:"p50"`
+	P95   float64 `json:"p95"`
+	Count int64   `json:"count"`
 }
 
-// GetMTTRStats returns MTTA and MTTR aggregated over a configurable time window.
-// Query param: hours (default 24, accepts 1/6/24/168/720)
+// SeverityMTTR holds MTTA/MTTR for a single severity level.
+type SeverityMTTR struct {
+	Severity string     `json:"severity"`
+	MTTA     MTTRMetric `json:"mtta"`
+	MTTR     MTTRMetric `json:"mttr"`
+}
+
+// MTTRStats holds time-to-acknowledge and time-to-resolve statistics over a
+// configurable window. Percentiles are computed in application code rather than
+// with SQL percentile functions so we stay portable across MySQL versions.
+type MTTRStats struct {
+	WindowHours int `json:"window_hours"`
+
+	// Overall (all severities combined).
+	MTTA MTTRMetric `json:"mtta"`
+	MTTR MTTRMetric `json:"mttr"`
+
+	// Per-severity breakdown. Order is critical → warning → info.
+	BySeverity []SeverityMTTR `json:"by_severity"`
+
+	// Legacy fields retained for older dashboard builds. These mirror the
+	// fields inside MTTA/MTTR above and should be phased out once the new
+	// UI is deployed everywhere.
+	MTTASeconds   float64 `json:"mtta_seconds"`
+	MTTRSeconds   float64 `json:"mttr_seconds"`
+	AckedCount    int64   `json:"acked_count"`
+	ResolvedCount int64   `json:"resolved_count"`
+}
+
+// percentile returns the `p` percentile (0–100) of a slice of durations in
+// seconds using nearest-rank. The input MUST be sorted ascending.
+// Returns -1 when the slice is empty.
+func percentile(sorted []float64, p float64) float64 {
+	n := len(sorted)
+	if n == 0 {
+		return -1
+	}
+	if n == 1 {
+		return sorted[0]
+	}
+	// Nearest-rank: ceil(p/100 * n) — result index in [1, n].
+	rank := int((p/100.0)*float64(n) + 0.9999999)
+	if rank < 1 {
+		rank = 1
+	}
+	if rank > n {
+		rank = n
+	}
+	return sorted[rank-1]
+}
+
+// computeMetric builds an MTTRMetric from an unsorted []float64 of seconds.
+func computeMetric(durations []float64) MTTRMetric {
+	n := len(durations)
+	if n == 0 {
+		return MTTRMetric{Mean: -1, P50: -1, P95: -1, Count: 0}
+	}
+	var sum float64
+	for _, d := range durations {
+		sum += d
+	}
+	sort.Float64s(durations)
+	return MTTRMetric{
+		Mean:  sum / float64(n),
+		P50:   percentile(durations, 50),
+		P95:   percentile(durations, 95),
+		Count: int64(n),
+	}
+}
+
+// GetMTTRStats returns MTTA and MTTR over a configurable window including
+// percentiles and severity breakdown.
+// GET /api/v1/dashboard/mttr-stats?hours=24
 func (h *DashboardHandler) GetMTTRStats(c *gin.Context) {
 	hours := 24
 	if v := c.Query("hours"); v != "" {
@@ -124,42 +190,163 @@ func (h *DashboardHandler) GetMTTRStats(c *gin.Context) {
 			hours = n
 		}
 	}
-
 	since := time.Now().Add(-time.Duration(hours) * time.Hour)
 
-	var stats MTTRStats
-	stats.WindowHours = hours
-	stats.MTTA = -1
-	stats.MTTR = -1
-
-	// MTTA: average seconds from fired_at to acked_at
-	type aggResult struct {
-		AvgSeconds float64
-		Cnt        int64
+	// Pull raw durations so we can compute mean + percentiles in Go. This
+	// avoids MySQL-version-specific percentile_disc / window tricks and
+	// keeps the SQL uniform. A 30-day window on a busy tenant is bounded
+	// by the number of fired events (typically <100k), which is fine to
+	// stream into memory.
+	type row struct {
+		Severity    string
+		AckSeconds  *float64
+		RespSeconds *float64
 	}
 
-	var mttaRes aggResult
+	var rows []row
 	h.db.Model(&model.AlertEvent{}).
-		Select("AVG(TIMESTAMPDIFF(SECOND, fired_at, acked_at)) AS avg_seconds, COUNT(*) AS cnt").
-		Where("acked_at IS NOT NULL AND fired_at >= ?", since).
-		Scan(&mttaRes)
-	if mttaRes.Cnt > 0 {
-		stats.MTTA = mttaRes.AvgSeconds
-		stats.AckedCount = mttaRes.Cnt
+		Select(`severity,
+			CASE WHEN acked_at    IS NOT NULL THEN TIMESTAMPDIFF(SECOND, fired_at, acked_at)    END AS ack_seconds,
+			CASE WHEN resolved_at IS NOT NULL THEN TIMESTAMPDIFF(SECOND, fired_at, resolved_at) END AS resp_seconds`).
+		Where("fired_at >= ? AND deleted_at IS NULL", since).
+		Scan(&rows)
+
+	var allAck, allResp []float64
+	perSev := map[string]*struct{ ack, resp []float64 }{}
+
+	for _, r := range rows {
+		if r.AckSeconds != nil && *r.AckSeconds >= 0 {
+			allAck = append(allAck, *r.AckSeconds)
+		}
+		if r.RespSeconds != nil && *r.RespSeconds >= 0 {
+			allResp = append(allResp, *r.RespSeconds)
+		}
+		sev := r.Severity
+		if sev == "" {
+			continue
+		}
+		bucket, ok := perSev[sev]
+		if !ok {
+			bucket = &struct{ ack, resp []float64 }{}
+			perSev[sev] = bucket
+		}
+		if r.AckSeconds != nil && *r.AckSeconds >= 0 {
+			bucket.ack = append(bucket.ack, *r.AckSeconds)
+		}
+		if r.RespSeconds != nil && *r.RespSeconds >= 0 {
+			bucket.resp = append(bucket.resp, *r.RespSeconds)
+		}
 	}
 
-	// MTTR: average seconds from fired_at to resolved_at
-	var mttrRes aggResult
-	h.db.Model(&model.AlertEvent{}).
-		Select("AVG(TIMESTAMPDIFF(SECOND, fired_at, resolved_at)) AS avg_seconds, COUNT(*) AS cnt").
-		Where("resolved_at IS NOT NULL AND fired_at >= ?", since).
-		Scan(&mttrRes)
-	if mttrRes.Cnt > 0 {
-		stats.MTTR = mttrRes.AvgSeconds
-		stats.ResolvedCount = mttrRes.Cnt
+	stats := MTTRStats{
+		WindowHours: hours,
+		MTTA:        computeMetric(allAck),
+		MTTR:        computeMetric(allResp),
 	}
+
+	// Deterministic severity ordering, most-critical first.
+	for _, sev := range []string{"critical", "warning", "info"} {
+		b, ok := perSev[sev]
+		if !ok {
+			b = &struct{ ack, resp []float64 }{}
+		}
+		stats.BySeverity = append(stats.BySeverity, SeverityMTTR{
+			Severity: sev,
+			MTTA:     computeMetric(b.ack),
+			MTTR:     computeMetric(b.resp),
+		})
+	}
+
+	// Legacy mirrors for older frontends.
+	stats.MTTASeconds = stats.MTTA.Mean
+	stats.MTTRSeconds = stats.MTTR.Mean
+	stats.AckedCount = stats.MTTA.Count
+	stats.ResolvedCount = stats.MTTR.Count
 
 	Success(c, stats)
+}
+
+// MTTRTrendPoint is one day of MTTA/MTTR means used to render trend lines.
+type MTTRTrendPoint struct {
+	Date          string  `json:"date"`
+	MTTASeconds   float64 `json:"mtta_seconds"`   // -1 if no data that day
+	MTTRSeconds   float64 `json:"mttr_seconds"`   // -1 if no data that day
+	AckedCount    int64   `json:"acked_count"`
+	ResolvedCount int64   `json:"resolved_count"`
+}
+
+// GetMTTRTrend returns day-by-day MTTA/MTTR means so operators can see whether
+// response times are improving or regressing over time.
+// GET /api/v1/dashboard/mttr-trend?days=30
+func (h *DashboardHandler) GetMTTRTrend(c *gin.Context) {
+	days := 30
+	if v := c.Query("days"); v != "" {
+		if n, _ := strconv.Atoi(v); n > 0 && n <= 365 {
+			days = n
+		}
+	}
+	since := time.Now().AddDate(0, 0, -days)
+
+	type ackRow struct {
+		Date   string
+		AvgSec float64
+		Cnt    int64
+	}
+
+	var mttaRows []ackRow
+	h.db.Model(&model.AlertEvent{}).
+		Select(`DATE(fired_at) AS date,
+			AVG(TIMESTAMPDIFF(SECOND, fired_at, acked_at)) AS avg_sec,
+			COUNT(acked_at) AS cnt`).
+		Where("fired_at >= ? AND acked_at IS NOT NULL AND deleted_at IS NULL", since).
+		Group("DATE(fired_at)").
+		Order("date").
+		Scan(&mttaRows)
+
+	var mttrRows []ackRow
+	h.db.Model(&model.AlertEvent{}).
+		Select(`DATE(fired_at) AS date,
+			AVG(TIMESTAMPDIFF(SECOND, fired_at, resolved_at)) AS avg_sec,
+			COUNT(resolved_at) AS cnt`).
+		Where("fired_at >= ? AND resolved_at IS NOT NULL AND deleted_at IS NULL", since).
+		Group("DATE(fired_at)").
+		Order("date").
+		Scan(&mttrRows)
+
+	// Merge both sides into a single date-indexed map, producing a point
+	// per calendar day that had *any* activity. Missing sides are emitted
+	// as -1 so the chart can show gaps clearly.
+	points := map[string]*MTTRTrendPoint{}
+	for _, r := range mttaRows {
+		p, ok := points[r.Date]
+		if !ok {
+			p = &MTTRTrendPoint{Date: r.Date, MTTASeconds: -1, MTTRSeconds: -1}
+			points[r.Date] = p
+		}
+		p.MTTASeconds = r.AvgSec
+		p.AckedCount = r.Cnt
+	}
+	for _, r := range mttrRows {
+		p, ok := points[r.Date]
+		if !ok {
+			p = &MTTRTrendPoint{Date: r.Date, MTTASeconds: -1, MTTRSeconds: -1}
+			points[r.Date] = p
+		}
+		p.MTTRSeconds = r.AvgSec
+		p.ResolvedCount = r.Cnt
+	}
+
+	dates := make([]string, 0, len(points))
+	for d := range points {
+		dates = append(dates, d)
+	}
+	sort.Strings(dates)
+
+	result := make([]MTTRTrendPoint, 0, len(dates))
+	for _, d := range dates {
+		result = append(result, *points[d])
+	}
+	Success(c, result)
 }
 
 // AlertTrendPoint represents a data point for the alert trend chart.
