@@ -963,6 +963,31 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 
+/* Sidebar entrance on first load */
+.sre-sider { animation: sre-slide-right 0.3s var(--sre-ease-out) both; }
+@keyframes sre-slide-right {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Header bar entrance */
+.header-bar { animation: sre-fade-in 0.25s var(--sre-ease-out) both; animation-delay: 60ms; }
+
+/* Content area entrance */
+.sre-content { animation: sre-fade-in 0.3s var(--sre-ease-out) both; animation-delay: 80ms; }
+
+/* Logo text smooth appear on uncollapse */
+.logo-text {
+  transition: opacity var(--sre-duration-base) var(--sre-ease-out),
+              transform var(--sre-duration-base) var(--sre-ease-out);
+}
+
+/* Breadcrumb page title shimmer-in on route change */
+.header-page-title {
+  transition: opacity var(--sre-duration-fast) var(--sre-ease-out),
+              transform var(--sre-duration-fast) var(--sre-ease-out);
+}
+
 /* ===== Profile Modal ===== */
 .avatar-section { display: flex; align-items: flex-start; gap: 16px; padding: 12px 0 4px; }
 .avatar-current {

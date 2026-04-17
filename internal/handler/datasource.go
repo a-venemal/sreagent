@@ -15,7 +15,7 @@ func NewDataSourceHandler(svc *service.DataSourceService) *DataSourceHandler {
 	return &DataSourceHandler{svc: svc}
 }
 
-// CreateDataSourceRequest is the request body for creating a datasource.
+// CreateDataSourceRequest is the request body for creating/updating a datasource.
 type CreateDataSourceRequest struct {
 	Name                string               `json:"name" binding:"required"`
 	Type                model.DataSourceType `json:"type" binding:"required"`
@@ -25,6 +25,7 @@ type CreateDataSourceRequest struct {
 	AuthType            string               `json:"auth_type"`
 	AuthConfig          string               `json:"auth_config"`
 	HealthCheckInterval int                  `json:"health_check_interval"`
+	IsEnabled           *bool                `json:"is_enabled"`
 }
 
 // Create creates a new datasource.
@@ -109,6 +110,9 @@ func (h *DataSourceHandler) Update(c *gin.Context) {
 		AuthType:            req.AuthType,
 		AuthConfig:          req.AuthConfig,
 		HealthCheckInterval: req.HealthCheckInterval,
+	}
+	if req.IsEnabled != nil {
+		ds.IsEnabled = *req.IsEnabled
 	}
 	ds.ID = id
 

@@ -213,8 +213,8 @@ onMounted(fetchList)
 
     <n-spin :show="loading">
       <n-grid :x-gap="16" :y-gap="16" :cols="3" responsive="screen">
-        <n-gi v-for="ds in datasources" :key="ds.id">
-          <n-card class="ds-card card-hover" :bordered="false">
+        <n-gi v-for="(ds, idx) in datasources" :key="ds.id" :style="{ '--sre-stagger-i': idx }">
+          <n-card class="ds-card card-hover stagger-item" :bordered="false">
             <div class="ds-header">
               <div class="ds-type-badge" :style="{ background: getTypeColor(ds.type) + '20', color: getTypeColor(ds.type) }">
                 {{ ds.type }}

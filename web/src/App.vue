@@ -208,10 +208,14 @@ provide('isDark', isDark)
 
 <template>
   <NConfigProvider :theme="theme" :theme-overrides="themeOverrides">
-    <NMessageProvider>
+    <NMessageProvider placement="top-right" :duration="2800" :max="4">
       <NDialogProvider>
-        <NNotificationProvider>
-          <router-view />
+        <NNotificationProvider placement="top-right" :max="4">
+          <router-view v-slot="{ Component, route }">
+            <transition name="sre-page" mode="out-in">
+              <component :is="Component" :key="route.path" />
+            </transition>
+          </router-view>
         </NNotificationProvider>
       </NDialogProvider>
     </NMessageProvider>
@@ -222,5 +226,25 @@ provide('isDark', isDark)
 body {
   margin: 0;
   padding: 0;
+}
+
+/* ── Top-level page transition ── */
+.sre-page-enter-active {
+  transition:
+    opacity     0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    transform   0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.sre-page-leave-active {
+  transition:
+    opacity     0.15s ease-in,
+    transform   0.15s ease-in;
+}
+.sre-page-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.sre-page-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 </style>

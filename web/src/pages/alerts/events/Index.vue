@@ -475,6 +475,12 @@ const activeFiltersCount = computed(() => {
 <style scoped>
 .events-page { max-width: 1440px; }
 
+/* Page sections entrance */
+.toolbar        { animation: sre-slide-up 0.22s var(--sre-ease-out) both; animation-delay: 0ms; }
+.status-summary { animation: sre-slide-up 0.22s var(--sre-ease-out) both; animation-delay: 55ms; }
+.batch-bar      { animation: sre-slide-up 0.18s var(--sre-ease-out) both; }
+:deep(.n-card)  { animation: sre-slide-up 0.28s var(--sre-ease-out) both; animation-delay: 90ms; }
+
 /* ===== Toolbar ===== */
 .toolbar {
   display: flex;

@@ -400,9 +400,9 @@ onMounted(() => {
 
     <!-- Top stat cards row -->
     <n-spin :show="loading">
-      <n-grid :x-gap="16" :y-gap="16" :cols="5" responsive="screen" style="margin-bottom: 20px">
-        <n-gi v-for="card in statCards" :key="card.key">
-          <div class="stat-card card-hover">
+      <n-grid :x-gap="16" :y-gap="16" :cols="5" responsive="screen" class="stat-grid" style="margin-bottom: 20px">
+        <n-gi v-for="(card, idx) in statCards" :key="card.key" :style="{ '--sre-stagger-i': idx }">
+          <div class="stat-card card-hover stagger-item">
             <div class="stat-card__accent" :style="{ background: card.gradient }" />
             <div class="stat-card__body">
               <div class="stat-card__icon" :style="{ background: card.color + '18', color: card.color }">
@@ -410,15 +410,15 @@ onMounted(() => {
               </div>
               <div class="stat-card__info">
                 <div class="stat-card__label">{{ t(card.titleKey) }}</div>
-                <div class="stat-card__value">{{ stats[card.key] }}</div>
+                <div class="stat-card__value count-in" :key="stats[card.key]">{{ stats[card.key] }}</div>
               </div>
             </div>
           </div>
         </n-gi>
 
         <!-- Engine status card -->
-        <n-gi>
-          <div class="stat-card card-hover">
+        <n-gi :style="{ '--sre-stagger-i': statCards.length }">
+          <div class="stat-card card-hover stagger-item">
             <div class="stat-card__accent" :style="{ background: engineStatus.running ? 'linear-gradient(135deg,#18a058,#0d6e3e)' : 'linear-gradient(135deg,#e88080,#c0392b)' }" />
             <div class="stat-card__body">
               <div class="stat-card__icon" :style="{ background: (engineStatus.running ? '#18a058' : '#e88080') + '18', color: engineStatus.running ? '#18a058' : '#e88080' }">
@@ -662,6 +662,12 @@ onMounted(() => {
 }
 
 /* ===== Stat Cards ===== */
+/* stagger-item: driven by --sre-stagger-i on parent n-gi */
+.stagger-item {
+  animation: sre-slide-up var(--sre-duration-slow) var(--sre-ease-out) both;
+  animation-delay: calc(var(--sre-stagger-i, 0) * 55ms);
+}
+
 .stat-card {
   background: var(--sre-bg-card);
   border: 1px solid var(--sre-border);
