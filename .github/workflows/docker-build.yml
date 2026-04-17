@@ -66,7 +66,7 @@ jobs:
   # ──────────────────────────────────────────────────────────
   # Job 3: 构建 linux/amd64 镜像并推送到 Docker Hub
   #         仅在 push v* tag 时执行（main 分支和 PR 只跑上面两个 job）
-  #         标签策略：仅 :v<tag> + :latest（不再发布 :major / :major.minor）
+  #         标签策略：仅 :<version> + :latest（不再发布 :major / :major.minor）
   # ──────────────────────────────────────────────────────────
   build-and-push:
     name: Build & Push Image
@@ -94,14 +94,14 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # 自动生成镜像标签：
-      #   推 v1.2.3 tag → :v1.2.3, :latest
+      #   v1.2.3 tag → :1.2.3, :latest
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern=v{{version}}
+            type=semver,pattern={{version}}
             type=raw,value=latest
 
       - name: Build and push
