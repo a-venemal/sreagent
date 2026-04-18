@@ -17,6 +17,8 @@ import type { DashboardStats, MTTRStats, MTTRTrendPoint, AlertEvent, EngineStatu
 import { formatTime } from '@/utils/format'
 import { getSeverityType, getEventStatusType } from '@/utils/alert'
 import PageHeader from '@/components/common/PageHeader.vue'
+import GlowCard from '@/components/common/GlowCard.vue'
+import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import {
   AlertCircleOutline,
   ServerOutline,
@@ -454,7 +456,14 @@ onMounted(() => {
     <n-spin :show="loading">
       <n-grid :x-gap="16" :y-gap="16" :cols="5" responsive="screen" class="stat-grid" style="margin-bottom: 20px">
         <n-gi v-for="(card, idx) in statCards" :key="card.key" :style="{ '--sre-stagger-i': idx }">
-          <div class="stat-card card-hover stagger-item">
+          <GlowCard
+            :variant="idx === 0 ? 'critical' : 'default'"
+            :glow="idx === 0 && stats.active_alerts > 0"
+            :conic="idx === 0 ? 'critical' : false"
+            :tilt="true"
+            padding="0"
+            class="stat-card-glow stagger-item"
+          >
             <div class="stat-card__accent" :style="{ background: card.gradient }" />
             <div class="stat-card__body">
               <div class="stat-card__icon" :style="{ background: card.color + '18', color: card.color }">
@@ -462,15 +471,24 @@ onMounted(() => {
               </div>
               <div class="stat-card__info">
                 <div class="stat-card__label">{{ t(card.titleKey) }}</div>
-                <div class="stat-card__value count-in" :key="stats[card.key]">{{ stats[card.key] }}</div>
+                <AnimatedNumber
+                  :value="stats[card.key]"
+                  class="stat-card__value"
+                />
               </div>
             </div>
-          </div>
+          </GlowCard>
         </n-gi>
 
         <!-- Engine status card -->
         <n-gi :style="{ '--sre-stagger-i': statCards.length }">
-          <div class="stat-card card-hover stagger-item">
+          <GlowCard
+            :variant="engineStatus.running ? 'success' : 'critical'"
+            :glow="!engineStatus.running"
+            :tilt="true"
+            padding="0"
+            class="stat-card-glow stagger-item"
+          >
             <div class="stat-card__accent" :style="{ background: engineStatus.running ? 'linear-gradient(135deg,#18a058,#0d6e3e)' : 'linear-gradient(135deg,#e88080,#c0392b)' }" />
             <div class="stat-card__body">
               <div class="stat-card__icon" :style="{ background: (engineStatus.running ? '#18a058' : '#e88080') + '18', color: engineStatus.running ? '#18a058' : '#e88080' }">
@@ -487,7 +505,7 @@ onMounted(() => {
                 <div class="engine-meta">{{ engineStatus.total_rules }} {{ t('engine.rulesUnit') }} · {{ engineStatus.active_alerts }} {{ t('engine.activeUnit') }}</div>
               </div>
             </div>
-          </div>
+          </GlowCard>
         </n-gi>
       </n-grid>
     </n-spin>
@@ -720,34 +738,10 @@ onMounted(() => {
   animation-delay: calc(var(--sre-stagger-i, 0) * 55ms);
 }
 
-.stat-card {
-  background: var(--sre-bg-card);
-  border: 1px solid var(--sre-border);
-  border-radius: var(--sre-radius-lg);
+/* GlowCard wrapper — overflow hidden so accent bar clips */
+.stat-card-glow {
   overflow: hidden;
-  position: relative;
-  transition: transform var(--sre-duration-base) var(--sre-ease-out),
-              box-shadow var(--sre-duration-base) var(--sre-ease-out),
-              border-color var(--sre-duration-base) var(--sre-ease-out);
-  isolation: isolate;
 }
-.stat-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: radial-gradient(600px circle at 0% 0%,
-              rgba(255,255,255,0.04), transparent 40%);
-  opacity: 0;
-  transition: opacity var(--sre-duration-base) var(--sre-ease-out);
-}
-.stat-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--sre-border-strong);
-  box-shadow: var(--sre-shadow-md);
-}
-.stat-card:hover::after { opacity: 1; }
 .stat-card__accent {
   height: 3px;
   width: 100%;

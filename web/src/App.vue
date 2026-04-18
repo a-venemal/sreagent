@@ -8,6 +8,8 @@ import {
 } from 'naive-ui'
 import type { GlobalThemeOverrides } from 'naive-ui'
 import { ref, provide, watch, onMounted, computed } from 'vue'
+import AuroraBackground from '@/components/common/AuroraBackground.vue'
+import SpotlightCursor from '@/components/common/SpotlightCursor.vue'
 
 const savedTheme = localStorage.getItem('sre-theme')
 const isDark = ref(savedTheme ? savedTheme === 'dark' : true)
@@ -208,6 +210,8 @@ provide('isDark', isDark)
 
 <template>
   <NConfigProvider :theme="theme" :theme-overrides="themeOverrides">
+    <AuroraBackground />
+    <SpotlightCursor />
     <NMessageProvider placement="top-right" :duration="2800" :max="4">
       <NDialogProvider>
         <NNotificationProvider placement="top-right" :max="4">

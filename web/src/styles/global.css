@@ -136,6 +136,44 @@
   --sre-z-overlay: 100;
   --sre-z-modal:   1000;
   --sre-z-toast:   2000;
+
+  /* --- Aurora / 极光 (v2.0 UI redesign) --- */
+  --sre-aurora-1: #18a058;   /* emerald */
+  --sre-aurora-2: #06b6d4;   /* teal */
+  --sre-aurora-3: #a78bfa;   /* violet */
+  --sre-aurora-4: #f472b6;   /* pink */
+  --sre-aurora-blur: 140px;
+  --sre-aurora-opacity: 0.38;
+
+  /* Rotating conic (used for gradient borders + focus rings) */
+  --sre-conic-brand: conic-gradient(
+    from var(--sre-conic-angle, 0deg),
+    #18a058, #06b6d4, #a78bfa, #f472b6, #18a058
+  );
+  --sre-conic-critical: conic-gradient(
+    from var(--sre-conic-angle, 0deg),
+    #ef4444, #f59e0b, #ef4444
+  );
+
+  /* Spotlight cursor */
+  --sre-spotlight-size: 520px;
+  --sre-spotlight-opacity: 0.12;
+
+  /* Noise texture (inline SVG data URL) */
+  --sre-noise-url: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.35 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");
+
+  /* Glow shadows */
+  --sre-shadow-glow-critical: 0 0 0 1px rgba(239,68,68,0.4), 0 0 32px rgba(239,68,68,0.28);
+  --sre-shadow-glow-success:  0 0 0 1px rgba(16,185,129,0.4), 0 0 32px rgba(16,185,129,0.22);
+  --sre-shadow-glow-accent:   0 0 0 1px rgba(6,182,212,0.35), 0 0 28px rgba(6,182,212,0.20);
+  --sre-shadow-soft-xl:       0 40px 80px -24px rgba(0,0,0,0.55), 0 8px 24px rgba(0,0,0,0.25);
+}
+
+/* Register conic-angle so @keyframes can animate it */
+@property --sre-conic-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
 }
 
 /* ===== Light theme overrides ===== */
@@ -172,6 +210,11 @@ body.light-theme {
   --sre-shadow-md:  0 8px 24px -8px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15,23,42,0.06);
   --sre-shadow-lg:  0 18px 40px -14px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(15,23,42,0.08);
   --sre-shadow-xl:  0 32px 64px -16px rgba(15, 23, 42, 0.22);
+
+  /* Aurora / spotlight tuned for light mode */
+  --sre-aurora-opacity: 0.22;
+  --sre-spotlight-opacity: 0.06;
+  --sre-shadow-soft-xl: 0 40px 80px -24px rgba(15,23,42,0.18), 0 8px 24px rgba(15,23,42,0.08);
 }
 
 /* ============================================================
@@ -467,6 +510,95 @@ body.light-theme ::-webkit-scrollbar-thumb:hover { background: rgba(15, 23, 42, 
 .text-muted     { color: var(--sre-text-muted); }
 .text-mono      { font-family: var(--sre-font-mono); }
 
+/* ============================================================
+   v2.0 Aurora × Soft Futurism
+   ============================================================ */
+
+/* Aurora drift — slow organic float for background orbs */
+@keyframes sre-aurora-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+  33%      { transform: translate3d(4%, -3%, 0) rotate(4deg) scale(1.06); }
+  66%      { transform: translate3d(-3%, 3%, 0) rotate(-3deg) scale(0.96); }
+}
+
+/* Conic angle rotation — drives .conic-border */
+@keyframes sre-conic-rotate {
+  to { --sre-conic-angle: 360deg; }
+}
+
+/* Stronger glass (for modals, palette, hero cards) */
+.surface-glass-strong {
+  background: color-mix(in srgb, var(--sre-bg-card) 62%, transparent);
+  backdrop-filter: saturate(170%) blur(22px);
+  -webkit-backdrop-filter: saturate(170%) blur(22px);
+  border: 1px solid var(--sre-border-strong);
+}
+body.light-theme .surface-glass-strong {
+  background: color-mix(in srgb, #ffffff 78%, transparent);
+}
+
+/* Conic rainbow border — subtle rotating rim light */
+.conic-border {
+  position: relative;
+  isolation: isolate;
+}
+.conic-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--sre-conic-brand);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  animation: sre-conic-rotate 10s linear infinite;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.conic-border--critical::before {
+  background: var(--sre-conic-critical);
+  animation-duration: 4s;
+  opacity: 0.95;
+}
+.conic-border--strong::before { opacity: 0.9; }
+
+/* Noise grain overlay — adds depth to large surfaces */
+.noise-overlay {
+  position: relative;
+}
+.noise-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--sre-noise-url);
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 1;
+}
+body.light-theme .noise-overlay::after { opacity: 0.025; }
+
+/* 3D tilt — JS sets --tilt-x --tilt-y custom properties */
+.tilt {
+  transform:
+    perspective(900px)
+    rotateX(calc(var(--tilt-y, 0) * 1deg))
+    rotateY(calc(var(--tilt-x, 0) * 1deg));
+  transition: transform 220ms var(--sre-ease-out);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.tilt:hover { transition-duration: 60ms; }
+
+/* Glow variants for GlowCard */
+.glow-critical { box-shadow: var(--sre-shadow-glow-critical); }
+.glow-success  { box-shadow: var(--sre-shadow-glow-success); }
+.glow-accent   { box-shadow: var(--sre-shadow-glow-accent); }
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -475,4 +607,5 @@ body.light-theme ::-webkit-scrollbar-thumb:hover { background: rgba(15, 23, 42, 
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+  .conic-border::before { animation: none !important; opacity: 0.3 !important; }
 }

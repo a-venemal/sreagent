@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useI18n } from 'vue-i18n'
 import { authApi } from '@/api'
 import { GlobeOutline, SunnyOutline, MoonOutline, LogInOutline } from '@vicons/ionicons5'
+import AuroraBackground from '@/components/common/AuroraBackground.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -81,11 +82,9 @@ onMounted(() => {
 
 <template>
   <div class="login-container" :class="{ light: !isDark }">
-    <div class="login-bg">
-      <div class="grid-lines" :class="{ light: !isDark }"></div>
-      <div class="glow-orb orb-1"></div>
-      <div class="glow-orb orb-2"></div>
-    </div>
+    <!-- Aurora replaces static orbs -->
+    <AuroraBackground intensity="bold" :absolute="true" />
+    <div class="grid-lines" :class="{ light: !isDark }" />
 
     <!-- Top right controls: language + theme -->
     <div class="login-controls">
@@ -101,12 +100,13 @@ onMounted(() => {
       </n-button>
     </div>
 
-    <div class="login-card" :class="{ light: !isDark }">
+    <div class="login-card conic-border noise-overlay" :class="{ light: !isDark }">
       <div class="login-header">
         <img src="/logo.svg" alt="SREAgent" class="login-logo" />
         <h1 class="logo-text">
           <span class="gradient-text">SRE</span><span class="agent-text" :class="{ light: !isDark }">Agent</span>
         </h1>
+        <p class="eyebrow" style="margin-top:10px;margin-bottom:0">SRE · Alert Intelligence</p>
         <p class="login-subtitle" :class="{ light: !isDark }">{{ t('auth.subtitle') }}</p>
       </div>
 
@@ -177,13 +177,13 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   position: relative;
-  background: #0a0a0f;
+  background: var(--sre-bg-base);
   overflow: hidden;
-  transition: background 0.3s ease;
+  transition: background var(--sre-duration-slow) var(--sre-ease-out);
 }
 
 .login-container.light {
-  background: #f0f2f5;
+  background: var(--sre-bg-page);
 }
 
 .login-controls {
@@ -196,110 +196,84 @@ onMounted(() => {
   gap: 8px;
 }
 
-.login-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-}
-
+/* Grid lines — subtle depth layer */
 .grid-lines {
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
   background-size: 60px 60px;
 }
-
 .grid-lines.light {
   background-image:
-    linear-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+    linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
 }
 
-.glow-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(100px);
-}
-
-.orb-1 {
-  width: 400px; height: 400px;
-  background: rgba(24, 160, 88, 0.15);
-  top: 10%; right: 20%;
-}
-
-.orb-2 {
-  width: 300px; height: 300px;
-  background: rgba(112, 192, 232, 0.1);
-  bottom: 20%; left: 15%;
-}
-
+/* Login card — glass + conic border via utility classes */
 .login-card {
-  width: 400px;
-  padding: 48px 40px;
-  background: rgba(24, 24, 28, 0.8);
-  backdrop-filter: blur(20px);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  width: 420px;
+  padding: 52px 44px;
+  border-radius: var(--sre-radius-2xl);
   position: relative;
-  z-index: 1;
-  transition: background 0.3s ease, border-color 0.3s ease;
+  z-index: 2;
+  /* glass base overridden by .surface-glass-strong */
+  background: color-mix(in srgb, var(--sre-bg-card) 62%, transparent);
+  backdrop-filter: saturate(170%) blur(24px);
+  -webkit-backdrop-filter: saturate(170%) blur(24px);
+  border: 1px solid var(--sre-border-strong);
+  box-shadow: var(--sre-shadow-soft-xl);
+  animation: sre-scale-in var(--sre-duration-slow) var(--sre-ease-spring) both;
 }
 
 .login-card.light {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
+  background: color-mix(in srgb, #ffffff 82%, transparent);
+  border-color: rgba(0,0,0,0.08);
 }
 
 .login-header {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 36px;
 }
 
 .login-logo {
-  width: 56px;
-  height: 56px;
+  width: 60px;
+  height: 60px;
   display: block;
-  margin: 0 auto 14px;
-  filter: drop-shadow(0 8px 24px rgba(24, 160, 88, 0.45));
+  margin: 0 auto 16px;
+  filter: drop-shadow(0 8px 28px rgba(24, 160, 88, 0.50));
+  animation: sre-bounce-in 0.6s var(--sre-ease-spring) 0.1s both;
 }
 
 .logo-text {
-  font-size: 36px;
+  font-size: 38px;
   font-weight: 700;
-  margin: 0 0 8px 0;
-  letter-spacing: -1px;
+  margin: 0 0 6px 0;
+  letter-spacing: -1.5px;
 }
 
 .agent-text {
-  color: #fff;
+  color: var(--sre-text-primary);
   font-weight: 300;
-  transition: color 0.3s ease;
+  transition: color var(--sre-duration-slow) var(--sre-ease-out);
 }
 
 .agent-text.light {
-  color: #333;
+  color: rgba(15,23,42,0.85);
 }
 
 .login-subtitle {
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 14px;
-  margin: 0;
-  transition: color 0.3s ease;
+  color: var(--sre-text-tertiary);
+  font-size: var(--sre-fs-sm);
+  margin: 6px 0 0;
+  transition: color var(--sre-duration-slow) var(--sre-ease-out);
 }
+.login-subtitle.light { color: rgba(0, 0, 0, 0.42); }
 
-.login-subtitle.light {
-  color: rgba(0, 0, 0, 0.45);
-}
-
-.sso-section {
-  margin-top: 16px;
-}
+.sso-section { margin-top: 16px; }
 
 .login-footer {
   text-align: center;
