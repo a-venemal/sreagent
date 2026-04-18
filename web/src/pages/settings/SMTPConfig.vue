@@ -71,6 +71,10 @@ async function testConnection() {
   }
 }
 
+function handlePasswordFocus() {
+  if (form.password === '********') form.password = ''
+}
+
 onMounted(fetchConfig)
 </script>
 
@@ -116,7 +120,7 @@ onMounted(fetchConfig)
             type="password"
             show-password-on="click"
             :placeholder="form.password === '********' ? t('smtp.passwordMasked') : t('smtp.passwordPlaceholder')"
-            @focus="if (form.password === '********') form.password = ''"
+            @focus="handlePasswordFocus"
           />
         </n-form-item>
 
