@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
-import { scheduleApi, teamApi, userApi } from '@/api'
+import { scheduleApi, teamApi, userApi, scheduleICalApi } from '@/api'
 import type { Schedule, Team, User, OnCallShift } from '@/types'
 
 import ScheduleSidebar from './ScheduleSidebar.vue'
@@ -259,6 +259,12 @@ async function handleDeleteSchedule(id: number) {
   }
 }
 
+function handleExportICal() {
+  if (!selectedSchedule.value) return
+  const url = scheduleICalApi.exportURL(selectedSchedule.value.id)
+  window.open(url, '_blank')
+}
+
 function handleCalendarDayClick(day: Date, event: MouseEvent) {
   if (!selectedSchedule.value) return
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
@@ -316,6 +322,9 @@ onMounted(() => {
               </n-popconfirm>
               <n-button size="small" type="primary" @click="showGenerateModal = true">
                 {{ t('schedule.generateShifts') }}
+              </n-button>
+              <n-button size="small" quaternary @click="handleExportICal" :title="t('ical.exportHint')">
+                📅 {{ t('ical.exportCalendar') }}
               </n-button>
             </n-space>
           </div>

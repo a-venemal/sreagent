@@ -59,6 +59,32 @@ func (r *AlertRuleRepository) List(ctx context.Context, severity, status, groupN
 	return list, total, nil
 }
 
+// ListHeartbeat returns all heartbeat-type alert rules (regardless of pagination).
+func (r *AlertRuleRepository) ListHeartbeat(ctx context.Context) ([]model.AlertRule, int64, error) {
+	var list []model.AlertRule
+	var total int64
+	q := r.db.WithContext(ctx).Model(&model.AlertRule{}).Where("rule_type = ?", model.RuleTypeHeartbeat)
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	if err := q.Preload("DataSource").Find(&list).Error; err != nil {
+		return nil, 0, err
+	}
+	return list, total, nil
+}
+
+// GetByHeartbeatToken returns the rule whose heartbeat_token matches the given token.
+func (r *AlertRuleRepository) GetByHeartbeatToken(ctx context.Context, token string) (*model.AlertRule, error) {
+	var rule model.AlertRule
+	err := r.db.WithContext(ctx).
+		Where("heartbeat_token = ? AND rule_type = ?", token, model.RuleTypeHeartbeat).
+		First(&rule).Error
+	if err != nil {
+		return nil, err
+	}
+	return &rule, nil
+}
+
 // ListCategories returns all distinct non-empty category values.
 func (r *AlertRuleRepository) ListCategories(ctx context.Context) ([]string, error) {
 	var categories []string

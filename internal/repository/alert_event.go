@@ -181,6 +181,14 @@ func (r *AlertEventRepository) BulkAcknowledge(ctx context.Context, ids []uint, 
 	return result.RowsAffected, result.Error
 }
 
+// UpdateSLAEscalated sets the sla_escalated_at timestamp on an event record.
+func (r *AlertEventRepository) UpdateSLAEscalated(ctx context.Context, eventID uint, at time.Time) error {
+	return r.db.WithContext(ctx).
+		Model(&model.AlertEvent{}).
+		Where("id = ?", eventID).
+		UpdateColumn("sla_escalated_at", at).Error
+}
+
 // BulkClose closes multiple events in one UPDATE … WHERE id IN (ids).
 // Returns the number of rows actually updated.
 func (r *AlertEventRepository) BulkClose(ctx context.Context, ids []uint) (int64, error) {

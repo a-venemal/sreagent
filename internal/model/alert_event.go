@@ -52,6 +52,9 @@ type AlertEvent struct {
 	// Lark Bot API message ID — set when the alert card was sent via Bot API (not Incoming Webhook).
 	// Non-empty value enables in-place card updates on status change.
 	LarkMessageID string `json:"lark_message_id" gorm:"size:128;default:''"`
+	// SlaEscalatedAt records when the SLA breach escalation was fired for this event.
+	// Nil means no SLA escalation has been triggered yet.
+	SlaEscalatedAt *time.Time `json:"sla_escalated_at"`
 }
 
 func (AlertEvent) TableName() string {

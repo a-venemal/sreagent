@@ -62,9 +62,11 @@ export interface DataSource {
 // ===== Alert Rule =====
 export type AlertSeverity = 'critical' | 'warning' | 'info'
 export type AlertRuleStatus = 'enabled' | 'disabled' | 'muted'
+export type AlertRuleType = 'threshold' | 'heartbeat'
 
 export interface AlertRule {
   id: number
+  rule_type: AlertRuleType
   name: string
   display_name: string
   description: string
@@ -83,6 +85,12 @@ export interface AlertRule {
   updated_by: number
   created_at: string
   updated_at: string
+  // Heartbeat monitoring fields (only relevant when rule_type='heartbeat')
+  heartbeat_token: string
+  heartbeat_interval: number
+  heartbeat_last_at: string | null
+  // SLA auto-escalation (0 = disabled)
+  ack_sla_minutes: number
 }
 
 // ===== Alert Event =====
@@ -115,6 +123,7 @@ export interface AlertEvent {
   oncall_user_id?: number | null
   oncall_user?: User
   is_dispatched?: boolean
+  sla_escalated_at?: string | null
   created_at: string
 }
 
@@ -486,4 +495,18 @@ export interface QueryResponse {
     values: Array<{ ts: number; value: number }>
   }>
   raw_count: number
+}
+
+// ===== Inhibition Rules =====
+export interface InhibitionRule {
+  id: number
+  name: string
+  description: string
+  source_match: Record<string, string>
+  target_match: Record<string, string>
+  equal_labels: string
+  is_enabled: boolean
+  created_by: number
+  created_at: string
+  updated_at: string
 }

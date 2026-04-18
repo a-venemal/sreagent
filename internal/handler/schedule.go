@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"bytes"
+	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -723,4 +726,84 @@ func (h *ScheduleHandler) GenerateShifts(c *gin.Context) {
 	}
 
 	Success(c, gin.H{"message": "shifts generated", "weeks": req.Weeks})
+}
+
+// ExportICal generates an RFC 5545 iCalendar feed for a schedule's upcoming shifts.
+// GET /api/v1/schedules/:id/ical
+// Returns text/calendar content for import into Google Calendar, Outlook, Apple Calendar, etc.
+func (h *ScheduleHandler) ExportICal(c *gin.Context) {
+	scheduleID, err := GetIDParam(c, "id")
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	// Fetch schedule metadata
+	schedule, err := h.svc.GetScheduleByID(c.Request.Context(), scheduleID)
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	// Fetch upcoming shifts (next 90 days)
+	now := time.Now()
+	end := now.Add(90 * 24 * time.Hour)
+	shifts, err := h.svc.ListShifts(c.Request.Context(), scheduleID, now.Add(-30*24*time.Hour), end)
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	// Build RFC 5545 VCALENDAR
+	var buf bytes.Buffer
+	buf.WriteString("BEGIN:VCALENDAR\r\n")
+	buf.WriteString("VERSION:2.0\r\n")
+	buf.WriteString("PRODID:-//SREAgent//OnCall Schedule//EN\r\n")
+	buf.WriteString("CALSCALE:GREGORIAN\r\n")
+	buf.WriteString("METHOD:PUBLISH\r\n")
+	buf.WriteString(fmt.Sprintf("X-WR-CALNAME:%s\r\n", icalEscape(schedule.Name)))
+	buf.WriteString(fmt.Sprintf("X-WR-TIMEZONE:%s\r\n", schedule.Timezone))
+
+	for _, shift := range shifts {
+		userName := shift.User.DisplayName
+		if userName == "" {
+			userName = shift.User.Username
+		}
+
+		uid := fmt.Sprintf("shift-%d-%d@sreagent", shift.ID, scheduleID)
+		dtStart := shift.StartTime.UTC().Format("20060102T150405Z")
+		dtEnd := shift.EndTime.UTC().Format("20060102T150405Z")
+		dtStamp := now.UTC().Format("20060102T150405Z")
+
+		summary := fmt.Sprintf("On-call: %s (%s)", userName, schedule.Name)
+		description := fmt.Sprintf("Schedule: %s\\nOn-call: %s", schedule.Name, userName)
+		if shift.Note != "" {
+			description += "\\nNote: " + icalEscape(shift.Note)
+		}
+
+		buf.WriteString("BEGIN:VEVENT\r\n")
+		buf.WriteString(fmt.Sprintf("UID:%s\r\n", uid))
+		buf.WriteString(fmt.Sprintf("DTSTAMP:%s\r\n", dtStamp))
+		buf.WriteString(fmt.Sprintf("DTSTART:%s\r\n", dtStart))
+		buf.WriteString(fmt.Sprintf("DTEND:%s\r\n", dtEnd))
+		buf.WriteString(fmt.Sprintf("SUMMARY:%s\r\n", icalEscape(summary)))
+		buf.WriteString(fmt.Sprintf("DESCRIPTION:%s\r\n", description))
+		buf.WriteString("END:VEVENT\r\n")
+	}
+
+	buf.WriteString("END:VCALENDAR\r\n")
+
+	filename := fmt.Sprintf("oncall-%d.ics", scheduleID)
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	c.Data(200, "text/calendar; charset=utf-8", buf.Bytes())
+}
+
+// icalEscape escapes special characters in iCalendar text values.
+func icalEscape(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, ";", `\;`)
+	s = strings.ReplaceAll(s, ",", `\,`)
+	s = strings.ReplaceAll(s, "\n", `\n`)
+	s = strings.ReplaceAll(s, "\r", "")
+	return s
 }

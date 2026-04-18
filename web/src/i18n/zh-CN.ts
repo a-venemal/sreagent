@@ -48,6 +48,7 @@ export default {
     alertEvents: '告警事件',
     alertHistory: '历史告警',
     muteRules: '屏蔽规则',
+    inhibitionRules: '告警抑制',
     notification: '通知管理',
     notifyRules: '通知规则',
     notifyMedia: '通知媒介',
@@ -897,5 +898,48 @@ export default {
     zh: '中文',
     en: 'English',
     switch: '切换语言',
+  },
+  // Inhibition Rules
+  inhibition: {
+    title: '告警抑制',
+    description: '当来源告警触发时，抑制匹配的目标告警通知',
+    createRule: '新建抑制规则',
+    editRule: '编辑抑制规则',
+    name: '规则名称',
+    sourceMatch: '来源匹配标签',
+    targetMatch: '目标匹配标签',
+    equalLabels: '等值标签',
+    equalLabelsHint: '逗号分隔的标签名，来源和目标必须具有相同的值才触发抑制',
+    isEnabled: '启用',
+    noRules: '暂无抑制规则',
+    addLabel: '添加标签',
+  },
+  // Heartbeat Monitoring
+  heartbeat: {
+    ruleType: '规则类型',
+    threshold: '阈值型（PromQL/LogQL）',
+    type: '心跳型（Heartbeat）',
+    token: '心跳 Token',
+    tokenHint: '唯一令牌，用于构造心跳 URL：POST /heartbeat/:token',
+    generateToken: '生成 Token',
+    interval: '心跳间隔（秒）',
+    intervalHint: '超过此时长未收到心跳则触发告警',
+    lastAt: '最后心跳时间',
+    pingUrl: '心跳 URL',
+    copyUrl: '复制',
+    copied: '已复制',
+    neverPinged: '从未接收到心跳',
+  },
+  // SLA
+  sla: {
+    ackSlaMinutes: '确认 SLA（分钟）',
+    ackSlaHint: '0 表示不启用；超过此分钟数未确认则触发升级',
+    breached: 'SLA 已超时',
+    escalatedAt: '升级时间',
+  },
+  // iCal Export
+  ical: {
+    exportCalendar: '导出日历',
+    exportHint: '导出为 iCal 格式（.ics），可导入 Google 日历、Outlook、Apple 日历等',
   },
 }

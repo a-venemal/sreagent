@@ -22,6 +22,7 @@ type EscalationExecutor struct {
 	policyRepo           *repository.EscalationPolicyRepository
 	stepRepo             *repository.EscalationStepRepository
 	eventRepo            *repository.AlertEventRepository
+	ruleRepo             *repository.AlertRuleRepository // optional — used for SLA checks
 	timelineRepo         *repository.AlertTimelineRepository
 	channelRepo          *repository.NotifyChannelRepository
 	userRepo             *repository.UserRepository
@@ -29,7 +30,7 @@ type EscalationExecutor struct {
 	userNotifyConfigRepo *repository.UserNotifyConfigRepository
 	teamRepo             service.TeamRepository
 	onCallShiftRepo      *repository.OnCallShiftRepository
-	larkSvc              *service.LarkService        // optional — enables lark_personal DM
+	larkSvc              *service.LarkService          // optional — enables lark_personal DM
 	settingSvc           *service.SystemSettingService // optional — enables personal email via global SMTP
 	logger               *zap.Logger
 
@@ -48,6 +49,11 @@ func (e *EscalationExecutor) SetLarkService(svc *service.LarkService) {
 // read global SMTP config for personal email escalation.
 func (e *EscalationExecutor) SetSettingService(svc *service.SystemSettingService) {
 	e.settingSvc = svc
+}
+
+// SetAlertRuleRepository injects the rule repository for SLA breach detection.
+func (e *EscalationExecutor) SetAlertRuleRepository(repo *repository.AlertRuleRepository) {
+	e.ruleRepo = repo
 }
 
 // NewEscalationExecutor creates a new EscalationExecutor.
@@ -138,7 +144,50 @@ func (e *EscalationExecutor) runOnce(ctx context.Context) {
 		}
 
 		e.escalateEvent(ctx, ev, now)
+		e.checkSLABreach(ctx, ev, now)
 	}
+}
+
+// checkSLABreach fires an SLA escalation when an unacknowledged firing alert
+// exceeds the rule's AckSlaMinutes threshold. Only fires once per event.
+func (e *EscalationExecutor) checkSLABreach(ctx context.Context, event *model.AlertEvent, now time.Time) {
+	// SLA check requires a rule repository and a rule with AckSlaMinutes > 0.
+	if e.ruleRepo == nil || event.RuleID == nil {
+		return
+	}
+	rule, err := e.ruleRepo.GetByID(ctx, *event.RuleID)
+	if err != nil || rule.AckSlaMinutes <= 0 {
+		return
+	}
+
+	// If the event has already been SLA-escalated, skip.
+	if event.SlaEscalatedAt != nil {
+		return
+	}
+
+	// SLA window starts from FiredAt.
+	slaDeadline := event.FiredAt.Add(time.Duration(rule.AckSlaMinutes) * time.Minute)
+	if now.Before(slaDeadline) {
+		return // still within SLA
+	}
+
+	// Record SLA escalation timestamp to prevent repeat fires.
+	slaAt := now
+	if err := e.eventRepo.UpdateSLAEscalated(ctx, event.ID, slaAt); err != nil {
+		e.logger.Error("sla: failed to mark sla_escalated_at",
+			zap.Uint("event_id", event.ID), zap.Error(err))
+		return
+	}
+
+	note := fmt.Sprintf("SLA breach: event not acknowledged within %d minutes (rule: %s)",
+		rule.AckSlaMinutes, rule.Name)
+	e.recordTimeline(ctx, event.ID, note)
+
+	e.logger.Warn("SLA breach detected",
+		zap.Uint("event_id", event.ID),
+		zap.String("alert_name", event.AlertName),
+		zap.Int("sla_minutes", rule.AckSlaMinutes),
+	)
 }
 
 // escalateEvent evaluates all escalation policies and executes any due steps for the given event.

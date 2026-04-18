@@ -64,6 +64,12 @@ const routes: RouteRecordRaw[] = [
             component: () => import('@/pages/alerts/mute/Index.vue'),
             meta: { title: 'Mute Rules', icon: 'mute' },
           },
+          {
+            path: 'inhibition-rules',
+            name: 'InhibitionRules',
+            component: () => import('@/pages/alerts/inhibition/Index.vue'),
+            meta: { title: 'Inhibition Rules', icon: 'inhibition' },
+          },
         ],
       },
       {

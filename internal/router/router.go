@@ -41,6 +41,8 @@ type Handlers struct {
 	UserNotifyConfig *handler.UserNotifyConfigHandler
 	AuditLog         *handler.AuditLogHandler
 	SMTPSettings     *handler.SMTPSettingsHandler
+	InhibitionRule   *handler.InhibitionRuleHandler
+	Heartbeat        *handler.HeartbeatHandler
 }
 
 // Setup initializes the Gin router with all routes and middleware.
@@ -65,6 +67,11 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 	webhooks := r.Group("/webhooks")
 	{
 		webhooks.POST("/alertmanager", handlers.AlertEvent.WebhookReceive)
+	}
+
+	// Heartbeat ping endpoint (no auth — token authenticates the sender)
+	if handlers.Heartbeat != nil {
+		r.POST("/heartbeat/:token", handlers.Heartbeat.Ping)
 	}
 
 	// Lark Bot callback (no auth - verified by token)
@@ -155,6 +162,18 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 				events.POST("/:id/silence", operate, handlers.AlertEvent.Silence)
 				events.POST("/batch/acknowledge", operate, handlers.AlertEvent.BatchAcknowledge)
 				events.POST("/batch/close", operate, handlers.AlertEvent.BatchClose)
+			}
+
+			// Inhibition Rules
+			if handlers.InhibitionRule != nil {
+				inhibitions := auth.Group("/inhibition-rules")
+				{
+					inhibitions.GET("", handlers.InhibitionRule.List)
+					inhibitions.GET("/:id", handlers.InhibitionRule.Get)
+					inhibitions.POST("", manage, handlers.InhibitionRule.Create)
+					inhibitions.PUT("/:id", manage, handlers.InhibitionRule.Update)
+					inhibitions.DELETE("/:id", manage, handlers.InhibitionRule.Delete)
+				}
 			}
 
 			// Mute Rules
@@ -307,6 +326,7 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 				schedules.PUT("/:id/shifts/:shiftId", manage, handlers.Schedule.UpdateShift)
 				schedules.DELETE("/:id/shifts/:shiftId", manage, handlers.Schedule.DeleteShift)
 				schedules.POST("/:id/generate-shifts", manage, handlers.Schedule.GenerateShifts)
+				schedules.GET("/:id/ical", handlers.Schedule.ExportICal)
 			}
 
 			// Escalation Policies

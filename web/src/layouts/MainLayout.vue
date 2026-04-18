@@ -100,7 +100,8 @@ const menuOptions = computed<MenuOption[]>(() => {
         { label: t('menu.alertRules'),   key: '/alerts/rules' },
         { label: t('menu.activeAlerts'), key: '/alerts/events' },
         { label: t('menu.alertHistory'), key: '/alerts/history' },
-        { label: t('menu.muteRules'),    key: '/alerts/mute-rules' },
+        { label: t('menu.muteRules'),       key: '/alerts/mute-rules' },
+        { label: t('menu.inhibitionRules'), key: '/alerts/inhibition-rules' },
       ],
     },
     { label: t('menu.notification'), key: '/notification', icon: renderIcon(NotificationsOutline) },
@@ -117,8 +118,9 @@ function resolveActiveKey(p: string): string {
   if (p.startsWith('/alerts/rules'))      return '/alerts/rules'
   if (p.startsWith('/alerts/events'))     return '/alerts/events'
   if (p.startsWith('/alerts/history'))    return '/alerts/history'
-  if (p.startsWith('/alerts/mute-rules')) return '/alerts/mute-rules'
-  if (p.startsWith('/notification'))      return '/notification'
+  if (p.startsWith('/alerts/mute-rules'))       return '/alerts/mute-rules'
+  if (p.startsWith('/alerts/inhibition-rules')) return '/alerts/inhibition-rules'
+  if (p.startsWith('/notification'))            return '/notification'
   return p
 }
 
@@ -188,6 +190,7 @@ const pageTitle = computed(() => {
   if (p.startsWith('/alerts/events'))             return t('menu.activeAlerts')
   if (p.startsWith('/alerts/history'))            return t('menu.alertHistory')
   if (p.startsWith('/alerts/mute-rules'))         return t('menu.muteRules')
+  if (p.startsWith('/alerts/inhibition-rules'))   return t('menu.inhibitionRules')
   if (p.startsWith('/notification'))              return t('menu.notification')
   if (p === '/schedule')                          return t('menu.schedule')
   if (p === '/settings')                          return t('menu.settings')

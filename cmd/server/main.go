@@ -100,6 +100,7 @@ func main() {
 	escalationStepRepo := repository.NewEscalationStepRepository(db)
 	teamRepo := service.NewTeamRepository(db)
 	muteRuleRepo := repository.NewMuteRuleRepository(db)
+	inhibitionRuleRepo := repository.NewInhibitionRuleRepository(db)
 	alertRuleHistoryRepo := repository.NewAlertRuleHistoryRepository(db)
 
 	// Phase 2 repositories
@@ -134,6 +135,7 @@ func main() {
 	teamSvc := service.NewTeamService(teamRepo, zapLogger)
 	scheduleSvc := service.NewScheduleService(scheduleRepo, participantRepo, overrideRepo, onCallShiftRepo, escalationPolicyRepo, escalationStepRepo, zapLogger)
 	muteRuleSvc := service.NewMuteRuleService(muteRuleRepo, zapLogger)
+	inhibitionRuleSvc := service.NewInhibitionRuleService(inhibitionRuleRepo, zapLogger)
 
 	// Phase 2 services
 	notifyMediaSvc := service.NewNotifyMediaService(notifyMediaRepo, zapLogger)
@@ -274,7 +276,46 @@ func main() {
 	)
 	escalationExecutor.SetLarkService(larkSvc)
 	escalationExecutor.SetSettingService(settingSvc)
+	escalationExecutor.SetAlertRuleRepository(ruleRepo)
 	escalationExecutor.Start()
+
+	// Initialize and start the heartbeat checker
+	heartbeatChecker := engine.NewHeartbeatChecker(ruleRepo, eventRepo, timelineRepo, zapLogger)
+
+	// Shared onAlert callback used by both the evaluator and heartbeat checker.
+	// Pipeline: inhibition → mute → notify.
+	onAlertFn := func(ctx context.Context, event *model.AlertEvent) {
+		// 1. Check inhibition rules (suppress target alerts when source is firing).
+		firingEvents, _, _ := eventSvc.List(ctx, "firing", "", 1, 2000)
+		if inhibitionRuleSvc.IsInhibited(ctx, event, firingEvents) {
+			zapLogger.Info("alert inhibited by inhibition rule, skipping notification",
+				zap.Uint("event_id", event.ID),
+				zap.String("alert_name", event.AlertName),
+			)
+			return
+		}
+
+		// 2. Check mute rules.
+		if muteRuleSvc.IsAlertMuted(ctx, event) {
+			zapLogger.Info("alert muted, skipping notification",
+				zap.Uint("event_id", event.ID),
+				zap.String("alert_name", event.AlertName),
+			)
+			return
+		}
+
+		// 3. Route notification.
+		if err := notifySvc.RouteAlert(ctx, event); err != nil {
+			zapLogger.Error("failed to route alert notification",
+				zap.Uint("event_id", event.ID),
+				zap.Error(err),
+			)
+		}
+	}
+
+	// Wire the heartbeat checker into the notification pipeline.
+	heartbeatChecker.SetOnAlert(onAlertFn)
+	heartbeatChecker.Start()
 
 	// Initialize alert evaluator
 	var evaluator *engine.Evaluator
@@ -295,25 +336,7 @@ func main() {
 			evaluator.SetSyncInterval(time.Duration(cfg.Engine.SyncInterval) * time.Second)
 		}
 
-		// Set onAlert callback: check mute rules, then route notification
-		evaluator.SetOnAlert(func(ctx context.Context, event *model.AlertEvent) {
-			// Check mute rules first
-			if muteRuleSvc.IsAlertMuted(ctx, event) {
-				zapLogger.Info("alert muted, skipping notification",
-					zap.Uint("event_id", event.ID),
-					zap.String("alert_name", event.AlertName),
-				)
-				return
-			}
-
-			// Route notification
-			if err := notifySvc.RouteAlert(ctx, event); err != nil {
-				zapLogger.Error("failed to route alert notification",
-					zap.Uint("event_id", event.ID),
-					zap.Error(err),
-				)
-			}
-		})
+		evaluator.SetOnAlert(onAlertFn)
 
 		// Start the evaluator
 		evaluator.Start()
@@ -356,6 +379,8 @@ func main() {
 		UserNotifyConfig: handler.NewUserNotifyConfigHandler(userNotifyConfigSvc),
 		AuditLog:         handler.NewAuditLogHandler(auditLogSvc),
 		SMTPSettings:     handler.NewSMTPSettingsHandler(settingSvc),
+		InhibitionRule:   handler.NewInhibitionRuleHandler(inhibitionRuleSvc),
+		Heartbeat:        handler.NewHeartbeatHandler(ruleSvc),
 	}
 
 	// Inject audit service into handlers that support it
@@ -395,6 +420,9 @@ func main() {
 
 	// Stop the escalation executor
 	escalationExecutor.Stop()
+
+	// Stop the heartbeat checker
+	heartbeatChecker.Stop()
 
 	// Stop the evaluator
 	if evaluator != nil {
@@ -503,6 +531,9 @@ func autoMigrate(db *gorm.DB) error {
 
 	// Platform settings
 	models = append(models, &model.SystemSetting{})
+
+	// Inhibition rules (alert suppression)
+	models = append(models, &model.InhibitionRule{})
 
 	return db.AutoMigrate(models...)
 }

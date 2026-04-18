@@ -1,5 +1,7 @@
 package model
 
+import "time"
+
 // AlertSeverity defines the severity level of an alert.
 type AlertSeverity string
 
@@ -18,9 +20,19 @@ const (
 	RuleStatusMuted    AlertRuleStatus = "muted"
 )
 
+// AlertRuleType identifies the evaluation strategy for a rule.
+type AlertRuleType string
+
+const (
+	RuleTypeThreshold AlertRuleType = "threshold" // default: PromQL/LogQL/Zabbix expression
+	RuleTypeHeartbeat AlertRuleType = "heartbeat" // fire when no ping received within interval
+)
+
 // AlertRule represents an alerting rule definition.
 type AlertRule struct {
 	BaseModel
+	// RuleType controls the evaluation strategy. Default is "threshold".
+	RuleType    AlertRuleType `json:"rule_type" gorm:"size:32;not null;default:threshold"`
 	Name         string     `json:"name" gorm:"size:256;not null;index"`
 	DisplayName  string     `json:"display_name" gorm:"size:256"`
 	Description  string     `json:"description" gorm:"type:text"`
@@ -52,6 +64,18 @@ type AlertRule struct {
 	SuppressEnabled bool `json:"suppress_enabled" gorm:"default:false"`
 	// Business group
 	BizGroupID *uint `json:"biz_group_id" gorm:"index"`
+
+	// Heartbeat monitoring (only relevant when RuleType="heartbeat")
+	// HeartbeatToken is the unique token embedded in the ping URL: POST /heartbeat/:token
+	HeartbeatToken    string     `json:"heartbeat_token" gorm:"size:128;not null;default:''"`
+	// HeartbeatInterval is the expected ping interval in seconds.
+	HeartbeatInterval int        `json:"heartbeat_interval" gorm:"not null;default:300"`
+	// HeartbeatLastAt is the timestamp of the last received ping.
+	HeartbeatLastAt   *time.Time `json:"heartbeat_last_at"`
+
+	// SLA (Service Level Agreement) — 0 means disabled.
+	// If AckSlaMinutes > 0 and the event is not acknowledged within this window, an escalation is triggered.
+	AckSlaMinutes int `json:"ack_sla_minutes" gorm:"not null;default:0"`
 }
 
 func (AlertRule) TableName() string {

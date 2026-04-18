@@ -35,6 +35,7 @@ import type {
   SeverityHistoryPoint,
   QueryResponse,
   AlertGroupItem,
+  InhibitionRule,
 } from '@/types'
 
 // ===== Auth API =====
@@ -592,4 +593,34 @@ export const alertExportApi = {
     if (params?.end) query.set('end', params.end)
     return `/api/v1/alert-events/export?${query.toString()}`
   },
+}
+
+// ===== Inhibition Rules API =====
+export const inhibitionRuleApi = {
+  list: (params?: { page?: number; page_size?: number }) =>
+    request.get<ApiResponse<PageData<InhibitionRule>>>('/inhibition-rules', { params }),
+
+  get: (id: number) =>
+    request.get<ApiResponse<InhibitionRule>>(`/inhibition-rules/${id}`),
+
+  create: (data: Partial<InhibitionRule>) =>
+    request.post<ApiResponse<InhibitionRule>>('/inhibition-rules', data),
+
+  update: (id: number, data: Partial<InhibitionRule>) =>
+    request.put<ApiResponse<InhibitionRule>>(`/inhibition-rules/${id}`, data),
+
+  delete: (id: number) =>
+    request.delete<ApiResponse<null>>(`/inhibition-rules/${id}`),
+}
+
+// ===== iCal Schedule Export =====
+export const scheduleICalApi = {
+  exportURL: (scheduleId: number) =>
+    `/api/v1/schedules/${scheduleId}/ical`,
+}
+
+// ===== Heartbeat Ping (public, no auth) =====
+export const heartbeatApi = {
+  ping: (token: string) =>
+    request.post<ApiResponse<{ status: string }>>(`/heartbeat/${token}`),
 }

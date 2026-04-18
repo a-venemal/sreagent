@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -85,6 +86,11 @@ func (s *AlertRuleService) Update(ctx context.Context, rule *model.AlertRule) er
 	existing.NoDataDuration = rule.NoDataDuration
 	existing.SuppressEnabled = rule.SuppressEnabled
 	existing.BizGroupID = rule.BizGroupID
+	// Heartbeat / SLA fields
+	existing.RuleType = rule.RuleType
+	existing.HeartbeatToken = rule.HeartbeatToken
+	existing.HeartbeatInterval = rule.HeartbeatInterval
+	existing.AckSlaMinutes = rule.AckSlaMinutes
 	existing.Version++
 
 	if err := s.repo.Update(ctx, existing); err != nil {
@@ -145,6 +151,23 @@ func (s *AlertRuleService) UpdateStatus(ctx context.Context, id uint, status mod
 	}
 
 	s.recordHistory(ctx, rule, "updated")
+	return nil
+}
+
+// RecordHeartbeatPing is called when a valid heartbeat token is received via
+// POST /heartbeat/:token. It looks up the rule and updates HeartbeatLastAt.
+func (s *AlertRuleService) RecordHeartbeatPing(ctx context.Context, token string) error {
+	rule, err := s.repo.GetByHeartbeatToken(ctx, token)
+	if err != nil {
+		return apperr.ErrNotFound
+	}
+	now := time.Now()
+	rule.HeartbeatLastAt = &now
+	if err := s.repo.Update(ctx, rule); err != nil {
+		s.logger.Error("failed to update heartbeat_last_at", zap.Uint("rule_id", rule.ID), zap.Error(err))
+		return apperr.Wrap(apperr.ErrDatabase, err)
+	}
+	s.logger.Debug("heartbeat ping recorded", zap.String("rule_name", rule.Name), zap.Uint("rule_id", rule.ID))
 	return nil
 }
 
