@@ -6,8 +6,8 @@ import { subscribeRuleApi, notifyRuleApi, userApi, teamApi } from '@/api'
 import type { SubscribeRule, NotifyRule, User, Team } from '@/types'
 import { AddOutline } from '@vicons/ionicons5'
 import { getSeverityType } from '@/utils/alert'
-import { kvArrayToRecord } from '@/utils/format'
-import KVEditor from '@/components/common/KVEditor.vue'
+import LabelMatcherEditor from '@/components/common/LabelMatcherEditor.vue'
+import type { LabelMatcher } from '@/components/common/LabelMatcherEditor.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 
 const message = useMessage()
@@ -28,7 +28,7 @@ const teams = ref<Team[]>([])
 const form = reactive({
   name: '',
   description: '',
-  match_labels: [] as { key: string; value: string }[],
+  match_labels: [] as LabelMatcher[],
   severities: [] as string[],
   notify_rule_id: null as number | null,
   subscriber_type: 'user' as 'user' | 'team',
@@ -207,7 +207,7 @@ function openEdit(row: SubscribeRule) {
   Object.assign(form, {
     name: row.name,
     description: row.description,
-    match_labels: Object.entries(row.match_labels || {}).map(([key, value]) => ({ key, value })),
+    match_labels: Object.entries(row.match_labels || {}).map(([key, value]) => ({ key, op: '=', value })),
     severities: (row.severities || '').split(',').filter(Boolean),
     notify_rule_id: row.notify_rule_id,
     subscriber_type: row.team_id ? 'team' : 'user',
@@ -229,7 +229,7 @@ async function handleSave() {
     const payload: Partial<SubscribeRule> = {
       name: form.name,
       description: form.description,
-      match_labels: kvArrayToRecord(form.match_labels),
+      match_labels: Object.fromEntries(form.match_labels.map(m => [m.key, m.value])),
       severities: form.severities.join(','),
       notify_rule_id: form.notify_rule_id || 0,
       user_id: form.subscriber_type === 'user' ? form.user_id : null,
@@ -303,7 +303,7 @@ onMounted(() => {
         </n-form-item>
 
         <n-form-item :label="t('subscribe.matchLabels')">
-          <KVEditor v-model:modelValue="form.match_labels" :add-label="t('subscribe.addLabel')" />
+          <LabelMatcherEditor v-model:modelValue="form.match_labels" :add-label="t('subscribe.addLabel')" />
         </n-form-item>
 
         <n-form-item :label="t('subscribe.severities')">

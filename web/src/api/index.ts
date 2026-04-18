@@ -624,3 +624,19 @@ export const heartbeatApi = {
   ping: (token: string) =>
     request.post<ApiResponse<{ status: string }>>(`/heartbeat/${token}`),
 }
+
+// ===== Label Registry API =====
+export const labelRegistryApi = {
+  getKeys: (datasourceId?: number) =>
+    request.get<ApiResponse<string[]>>('/label-registry/keys', {
+      params: datasourceId ? { datasource_id: datasourceId } : {}
+    }),
+
+  getValues: (key: string, datasourceId?: number) =>
+    request.get<ApiResponse<string[]>>('/label-registry/values', {
+      params: { key, ...(datasourceId ? { datasource_id: datasourceId } : {}) }
+    }),
+
+  sync: () =>
+    request.post<ApiResponse<{ message: string }>>('/label-registry/sync'),
+}

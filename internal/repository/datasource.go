@@ -66,3 +66,10 @@ func (r *DataSourceRepository) Update(ctx context.Context, ds *model.DataSource)
 func (r *DataSourceRepository) Delete(ctx context.Context, id uint) error {
 	return r.db.WithContext(ctx).Delete(&model.DataSource{}, id).Error
 }
+
+// ListEnabled returns all enabled datasources.
+func (r *DataSourceRepository) ListEnabled(ctx context.Context) ([]model.DataSource, error) {
+	var list []model.DataSource
+	err := r.db.WithContext(ctx).Where("is_enabled = ?", true).Find(&list).Error
+	return list, err
+}

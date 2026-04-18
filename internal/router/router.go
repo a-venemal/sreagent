@@ -43,6 +43,7 @@ type Handlers struct {
 	SMTPSettings     *handler.SMTPSettingsHandler
 	InhibitionRule   *handler.InhibitionRuleHandler
 	Heartbeat        *handler.HeartbeatHandler
+	LabelRegistry    *handler.LabelRegistryHandler
 }
 
 // Setup initializes the Gin router with all routes and middleware.
@@ -185,6 +186,16 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 				mutes.POST("", manage, handlers.MuteRule.Create)
 				mutes.PUT("/:id", manage, handlers.MuteRule.Update)
 				mutes.DELETE("/:id", manage, handlers.MuteRule.Delete)
+			}
+
+			// Label Registry (autocomplete for match_labels)
+			if handlers.LabelRegistry != nil {
+				labelReg := auth.Group("/label-registry")
+				{
+					labelReg.GET("/keys", handlers.LabelRegistry.GetKeys)
+					labelReg.GET("/values", handlers.LabelRegistry.GetValues)
+					labelReg.POST("/sync", adminOnly, handlers.LabelRegistry.Sync)
+				}
 			}
 
 			// Notify Rules (v2)

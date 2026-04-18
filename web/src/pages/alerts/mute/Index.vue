@@ -4,10 +4,11 @@ import { useMessage, NTag, NButton, NSpace, NPopconfirm, NSwitch } from 'naive-u
 import { useI18n } from 'vue-i18n'
 import { muteRuleApi } from '@/api'
 import type { MuteRule } from '@/types'
-import { formatTime, kvArrayToRecord } from '@/utils/format'
+import { formatTime } from '@/utils/format'
 import { getSeverityType } from '@/utils/alert'
 import { AddOutline, RefreshOutline } from '@vicons/ionicons5'
-import KVEditor from '@/components/common/KVEditor.vue'
+import LabelMatcherEditor from '@/components/common/LabelMatcherEditor.vue'
+import type { LabelMatcher } from '@/components/common/LabelMatcherEditor.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 
 const message = useMessage()
@@ -26,7 +27,7 @@ const saving = ref(false)
 const defaultForm = {
   name: '',
   description: '',
-  match_labels: [] as { key: string; value: string }[],
+  match_labels: [] as LabelMatcher[],
   severities: [] as string[],
   start_time: null as number | null,
   end_time: null as number | null,
@@ -234,7 +235,7 @@ function openEdit(rule: MuteRule) {
   Object.assign(form, {
     name: rule.name,
     description: rule.description || '',
-    match_labels: Object.entries(rule.match_labels || {}).map(([key, value]) => ({ key, value })),
+    match_labels: Object.entries(rule.match_labels || {}).map(([key, value]) => ({ key, op: '=', value })),
     severities: parseSeverities(rule.severities),
     start_time: rule.start_time ? new Date(rule.start_time).getTime() : null,
     end_time: rule.end_time ? new Date(rule.end_time).getTime() : null,
@@ -259,7 +260,7 @@ async function handleSave() {
     const payload: Partial<MuteRule> = {
       name: form.name,
       description: form.description,
-      match_labels: kvArrayToRecord(form.match_labels),
+      match_labels: Object.fromEntries(form.match_labels.map(m => [m.key, m.value])),
       severities: form.severities.join(','),
       start_time: form.start_time ? new Date(form.start_time).toISOString() : null,
       end_time: form.end_time ? new Date(form.end_time).toISOString() : null,
@@ -424,7 +425,7 @@ onMounted(fetchRules)
 
         <!-- Match Labels -->
         <n-form-item :label="t('mute.matchLabels')">
-          <KVEditor v-model:modelValue="form.match_labels" :add-label="t('mute.addLabel')" />
+          <LabelMatcherEditor v-model:modelValue="form.match_labels" :add-label="t('mute.addLabel')" />
         </n-form-item>
 
         <!-- One-time Mute -->

@@ -110,6 +110,9 @@ func main() {
 	subscribeRuleRepo := repository.NewSubscribeRuleRepository(db)
 	bizGroupRepo := repository.NewBizGroupRepository(db)
 
+	// Label registry repository
+	labelRegistryRepo := repository.NewLabelRegistryRepository(db)
+
 	// Audit log repository
 	auditLogRepo := repository.NewAuditLogRepository(db)
 
@@ -146,6 +149,9 @@ func main() {
 	)
 	subscribeRuleSvc := service.NewSubscribeRuleService(subscribeRuleRepo, zapLogger)
 	bizGroupSvc := service.NewBizGroupService(bizGroupRepo, zapLogger)
+
+	// Label registry service
+	labelRegistrySvc := service.NewLabelRegistryService(labelRegistryRepo, dsRepo, zapLogger)
 
 	// Audit log service
 	auditLogSvc := service.NewAuditLogService(auditLogRepo, zapLogger)
@@ -381,6 +387,7 @@ func main() {
 		SMTPSettings:     handler.NewSMTPSettingsHandler(settingSvc),
 		InhibitionRule:   handler.NewInhibitionRuleHandler(inhibitionRuleSvc),
 		Heartbeat:        handler.NewHeartbeatHandler(ruleSvc),
+		LabelRegistry:    handler.NewLabelRegistryHandler(labelRegistrySvc),
 	}
 
 	// Inject audit service into handlers that support it
@@ -401,6 +408,11 @@ func main() {
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
+
+	// Start label registry sync worker (cancels on shutdown via appCtx)
+	appCtx, appCancel := context.WithCancel(context.Background())
+	defer appCancel()
+	go labelRegistrySvc.StartSyncWorker(appCtx, 10*time.Minute)
 
 	// Graceful shutdown
 	go func() {
@@ -534,6 +546,9 @@ func autoMigrate(db *gorm.DB) error {
 
 	// Inhibition rules (alert suppression)
 	models = append(models, &model.InhibitionRule{})
+
+	// Label registry (autocomplete for match_labels)
+	models = append(models, &model.LabelRegistry{})
 
 	return db.AutoMigrate(models...)
 }

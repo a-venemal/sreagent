@@ -7,6 +7,10 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AnimatedNumber: typeof import('./components/common/AnimatedNumber.vue')['default']
+    AuroraBackground: typeof import('./components/common/AuroraBackground.vue')['default']
+    CommandPalette: typeof import('./components/common/CommandPalette.vue')['default']
+    GlowCard: typeof import('./components/common/GlowCard.vue')['default']
     KVEditor: typeof import('./components/common/KVEditor.vue')['default']
     NAlert: typeof import('naive-ui')['NAlert']
     NAvatar: typeof import('naive-ui')['NAvatar']
@@ -64,6 +68,8 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SeverityTag: typeof import('./components/common/SeverityTag.vue')['default']
+    SkeletonCard: typeof import('./components/common/SkeletonCard.vue')['default']
+    SpotlightCursor: typeof import('./components/common/SpotlightCursor.vue')['default']
     StatusTag: typeof import('./components/common/StatusTag.vue')['default']
   }
 }

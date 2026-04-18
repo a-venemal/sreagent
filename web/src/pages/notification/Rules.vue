@@ -5,9 +5,9 @@ import { useI18n } from 'vue-i18n'
 import { notifyRuleApi } from '@/api'
 import type { NotifyRule } from '@/types'
 import { AddOutline } from '@vicons/ionicons5'
-import { kvArrayToRecord } from '@/utils/format'
 import { getSeverityType } from '@/utils/alert'
-import KVEditor from '@/components/common/KVEditor.vue'
+import LabelMatcherEditor from '@/components/common/LabelMatcherEditor.vue'
+import type { LabelMatcher } from '@/components/common/LabelMatcherEditor.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 
 const message = useMessage()
@@ -24,7 +24,7 @@ const form = reactive({
   name: '',
   description: '',
   severities: [] as string[],
-  match_labels: [] as { key: string; value: string }[],
+  match_labels: [] as LabelMatcher[],
   pipeline: '[]',
   notify_configs: '[]',
   repeat_interval: 3600,
@@ -144,7 +144,7 @@ function openEdit(row: NotifyRule) {
     name: row.name,
     description: row.description,
     severities: (row.severities || '').split(',').filter(Boolean),
-    match_labels: Object.entries(row.match_labels || {}).map(([key, value]) => ({ key, value })),
+    match_labels: Object.entries(row.match_labels || {}).map(([key, value]) => ({ key, op: '=', value })),
     pipeline: row.pipeline || '[]',
     notify_configs: row.notify_configs || '[]',
     repeat_interval: row.repeat_interval,
@@ -180,7 +180,7 @@ async function handleSave() {
       name: form.name,
       description: form.description,
       severities: form.severities.join(','),
-      match_labels: kvArrayToRecord(form.match_labels),
+      match_labels: Object.fromEntries(form.match_labels.map(m => [m.key, m.value])),
       pipeline: form.pipeline,
       notify_configs: form.notify_configs,
       repeat_interval: form.repeat_interval,
@@ -271,7 +271,7 @@ onMounted(() => {
         </n-form-item>
 
         <n-form-item :label="t('notifyRule.matchLabels')">
-          <KVEditor v-model:modelValue="form.match_labels" :add-label="t('notifyRule.addLabel')" />
+          <LabelMatcherEditor v-model:modelValue="form.match_labels" :add-label="t('notifyRule.addLabel')" />
         </n-form-item>
 
         <n-form-item :label="t('notifyRule.pipeline')">
