@@ -8,6 +8,8 @@ import type { User, BizGroup } from '@/types'
 import { kvArrayToRecord } from '@/utils/format'
 import { AddOutline } from '@vicons/ionicons5'
 import KVEditor from '@/components/common/KVEditor.vue'
+import LabelMatcherEditor from '@/components/common/LabelMatcherEditor.vue'
+import type { LabelMatcher } from '@/components/common/LabelMatcherEditor.vue'
 
 const props = defineProps<{
   /** All users from the UserManagement tab for member selection */
@@ -35,6 +37,7 @@ const form = reactive({
   name: '',
   description: '',
   labels: [] as { key: string; value: string }[],
+  match_labels: [] as LabelMatcher[],
 })
 
 const memberRoleOptions = [
@@ -134,10 +137,26 @@ async function fetchMembers(groupId: number) {
   }
 }
 
+function recordToMatchers(record: Record<string, string> | undefined): LabelMatcher[] {
+  return Object.entries(record || {}).map(([key, raw]) => {
+    for (const op of ['!=', '=~', '!~'] as const) {
+      if (raw.startsWith(op)) return { key, op, value: raw.slice(op.length) }
+    }
+    return { key, op: '=' as const, value: raw }
+  })
+}
+
+function matchersToRecord(matchers: LabelMatcher[]): Record<string, string> {
+  return Object.fromEntries(matchers.map(m => {
+    const v = m.op === '=' ? m.value : `${m.op}${m.value}`
+    return [m.key, v]
+  }))
+}
+
 function openCreate() {
   editingId.value = null
   modalTitle.value = t('bizGroup.create')
-  Object.assign(form, { name: '', description: '', labels: [] })
+  Object.assign(form, { name: '', description: '', labels: [], match_labels: [] })
   showModal.value = true
 }
 
@@ -150,6 +169,7 @@ function openEdit() {
     name: g.name,
     description: g.description,
     labels: Object.entries(g.labels || {}).map(([key, value]) => ({ key, value })),
+    match_labels: recordToMatchers(g.match_labels),
   })
   showModal.value = true
 }
@@ -165,6 +185,7 @@ async function handleSave() {
       name: form.name,
       description: form.description,
       labels: kvArrayToRecord(form.labels),
+      match_labels: matchersToRecord(form.match_labels),
     }
     if (editingId.value) {
       await bizGroupApi.update(editingId.value, payload)
@@ -282,6 +303,12 @@ onMounted(() => {
             </n-space>
             <span v-else style="opacity: 0.3">-</span>
           </n-descriptions-item>
+          <n-descriptions-item :label="t('bizGroup.matchLabels')">
+            <n-space size="small" v-if="Object.keys(selectedGroup.match_labels || {}).length > 0">
+              <n-tag v-for="(v, k) in selectedGroup.match_labels" :key="k" size="small" type="info" :bordered="false">{{ k }}{{ v.startsWith('!=') || v.startsWith('=~') || v.startsWith('!~') ? v : '=' + v }}</n-tag>
+            </n-space>
+            <span v-else style="opacity: 0.3">-</span>
+          </n-descriptions-item>
         </n-descriptions>
 
         <div class="biz-members-header">
@@ -332,6 +359,13 @@ onMounted(() => {
 
         <n-form-item :label="t('settings.labels')">
           <KVEditor v-model="form.labels" :add-label="t('settings.addTeamLabel')" />
+        </n-form-item>
+
+        <n-form-item :label="t('bizGroup.matchLabels')">
+          <template #feedback>
+            <span style="font-size: 11px; opacity: 0.45">{{ t('bizGroup.matchLabelsDesc') }}</span>
+          </template>
+          <LabelMatcherEditor v-model:modelValue="form.match_labels" :add-label="t('bizGroup.addMatchLabel')" />
         </n-form-item>
       </n-form>
 

@@ -310,7 +310,27 @@ func main() {
 			return
 		}
 
-		// 3. Route notification.
+		// 3. Annotate event with matching BizGroup scope.
+		if groups, err := bizGroupSvc.FindMatchingGroups(ctx, map[string]string(event.Labels)); err == nil && len(groups) > 0 {
+			g := groups[0] // most specific match
+			if event.Labels == nil {
+				event.Labels = make(model.JSONLabels)
+			}
+			event.Labels["biz_group"] = g.Name
+			if g.ID != 0 {
+				event.Labels["biz_group_id"] = fmt.Sprintf("%d", g.ID)
+			}
+			// Merge group's own Labels into event (lower priority than existing)
+			for k, v := range g.Labels {
+				if _, exists := event.Labels[k]; !exists {
+					event.Labels[k] = v
+				}
+			}
+			// Persist the updated labels back to DB
+			_ = eventRepo.UpdateLabels(ctx, event.ID, event.Labels)
+		}
+
+		// 4. Route notification.
 		if err := notifySvc.RouteAlert(ctx, event); err != nil {
 			zapLogger.Error("failed to route alert notification",
 				zap.Uint("event_id", event.ID),

@@ -352,6 +352,7 @@ export interface BizGroup {
   description: string
   parent_id: number | null
   labels: Record<string, string>
+  match_labels?: Record<string, string>
   children?: BizGroup[]
   created_at: string
 }

@@ -305,15 +305,22 @@ func (re *RuleEvaluator) createAlertEvent(state *AlertState, status model.AlertE
 
 	fp := generateFingerprint(state.Labels)
 
-	// Merge rule labels into alert labels
+	// Merge labels — priority (high → low):
+	//   1. query result labels  (state.Labels)
+	//   2. rule static labels   (re.rule.Labels)
+	//   3. datasource labels    (re.datasource.Labels — e.g. biz_project, tenant, project)
 	labels := make(model.JSONLabels)
-	for k, v := range state.Labels {
+	// Lowest priority: datasource static labels (biz_project, tenant, project, etc.)
+	for k, v := range re.datasource.Labels {
 		labels[k] = v
 	}
+	// Rule labels override datasource labels
 	for k, v := range re.rule.Labels {
-		if _, exists := labels[k]; !exists {
-			labels[k] = v
-		}
+		labels[k] = v
+	}
+	// Query result labels have highest priority
+	for k, v := range state.Labels {
+		labels[k] = v
 	}
 	// Ensure severity and alertname are in labels
 	if _, ok := labels["severity"]; !ok {

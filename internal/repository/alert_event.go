@@ -181,6 +181,13 @@ func (r *AlertEventRepository) BulkAcknowledge(ctx context.Context, ids []uint, 
 	return result.RowsAffected, result.Error
 }
 
+// UpdateLabels patches only the labels column of an existing event.
+func (r *AlertEventRepository) UpdateLabels(ctx context.Context, id uint, labels model.JSONLabels) error {
+	return r.db.WithContext(ctx).Model(&model.AlertEvent{}).
+		Where("id = ?", id).
+		Update("labels", labels).Error
+}
+
 // UpdateSLAEscalated sets the sla_escalated_at timestamp on an event record.
 func (r *AlertEventRepository) UpdateSLAEscalated(ctx context.Context, eventID uint, at time.Time) error {
 	return r.db.WithContext(ctx).

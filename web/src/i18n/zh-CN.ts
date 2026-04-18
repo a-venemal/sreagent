@@ -596,6 +596,9 @@ export default {
     selectGroup: '请从左侧选择一个业务组',
     nameHint: '使用 / 分隔可形成树形结构，如 DBA/MySQL',
     management: '业务组管理',
+    matchLabels: '作用域匹配标签',
+    matchLabelsDesc: '当告警标签匹配时，自动将告警归属到本业务组',
+    addMatchLabel: '+ 添加匹配规则',
   },
   engine: {
     title: '告警引擎',

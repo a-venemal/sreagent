@@ -1,0 +1,1 @@
+ALTER TABLE biz_groups ADD COLUMN IF NOT EXISTS match_labels JSON NULL;

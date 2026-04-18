@@ -587,6 +587,9 @@ export default {
     selectGroup: 'Please select a business group from the left',
     nameHint: 'Use / separator for tree structure, e.g., DBA/MySQL',
     management: 'Business Group Management',
+    matchLabels: 'Scope Match Labels',
+    matchLabelsDesc: 'Alerts with matching labels will be automatically attributed to this group',
+    addMatchLabel: '+ Add Matcher',
   },
   engine: {
     title: 'Alert Engine',

@@ -8,6 +8,10 @@ type BizGroup struct {
 	Description string     `json:"description" gorm:"size:512"`
 	ParentID    *uint      `json:"parent_id" gorm:"index"`
 	Labels      JSONLabels `json:"labels" gorm:"type:json"`
+	// MatchLabels defines which alert labels this group "owns".
+	// Example: {"biz_project": "mdc"} means all alerts with biz_project=mdc belong to this group.
+	// Supports operator prefixes: "!=", "=~", "!~" (same as MuteRule/NotifyRule).
+	MatchLabels JSONLabels `json:"match_labels" gorm:"type:json"`
 	// Members
 	Members []User `json:"members,omitempty" gorm:"many2many:biz_group_members;"`
 }

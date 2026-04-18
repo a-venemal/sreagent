@@ -52,6 +52,13 @@ func (r *BizGroupRepository) List(ctx context.Context, page, pageSize int) ([]mo
 	return list, total, nil
 }
 
+// ListAll returns all business groups without pagination.
+func (r *BizGroupRepository) ListAll(ctx context.Context) ([]model.BizGroup, error) {
+	var groups []model.BizGroup
+	err := r.db.WithContext(ctx).Order("id ASC").Find(&groups).Error
+	return groups, err
+}
+
 // ListTree returns all business groups organized as a tree (by parent_id).
 // Returns all groups - the caller can build the tree structure.
 func (r *BizGroupRepository) ListTree(ctx context.Context) ([]model.BizGroup, error) {

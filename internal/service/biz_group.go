@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"sort"
 
 	"go.uber.org/zap"
 
@@ -126,6 +127,7 @@ func (s *BizGroupService) Update(ctx context.Context, group *model.BizGroup) err
 	existing.Description = group.Description
 	existing.ParentID = group.ParentID
 	existing.Labels = group.Labels
+	existing.MatchLabels = group.MatchLabels
 
 	if err := s.repo.Update(ctx, existing); err != nil {
 		s.logger.Error("failed to update biz group", zap.Error(err))
@@ -145,6 +147,30 @@ func (s *BizGroupService) Delete(ctx context.Context, id uint) error {
 		return apperr.Wrap(apperr.ErrDatabase, err)
 	}
 	return nil
+}
+
+// FindMatchingGroups returns all biz groups whose MatchLabels match the given alert labels.
+// Multiple groups can match (e.g., a "ts" group and a parent "trading" group).
+// Results are sorted by specificity: more matchers = more specific = first.
+func (s *BizGroupService) FindMatchingGroups(ctx context.Context, alertLabels map[string]string) ([]model.BizGroup, error) {
+	groups, err := s.repo.ListAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var matches []model.BizGroup
+	for _, g := range groups {
+		if len(g.MatchLabels) == 0 {
+			continue
+		}
+		if labelsMatch(g.MatchLabels, model.JSONLabels(alertLabels)) {
+			matches = append(matches, g)
+		}
+	}
+	// Sort: more specific (more matchers) first
+	sort.Slice(matches, func(i, j int) bool {
+		return len(matches[i].MatchLabels) > len(matches[j].MatchLabels)
+	})
+	return matches, nil
 }
 
 // AddMember adds a user to a business group with the specified role.
