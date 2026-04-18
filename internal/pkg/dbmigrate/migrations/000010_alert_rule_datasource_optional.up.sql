@@ -1,0 +1,1 @@
+ALTER TABLE alert_rules MODIFY COLUMN datasource_id BIGINT UNSIGNED NULL;

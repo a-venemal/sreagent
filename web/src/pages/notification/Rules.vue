@@ -144,7 +144,12 @@ function openEdit(row: NotifyRule) {
     name: row.name,
     description: row.description,
     severities: (row.severities || '').split(',').filter(Boolean),
-    match_labels: Object.entries(row.match_labels || {}).map(([key, value]) => ({ key, op: '=', value })),
+    match_labels: Object.entries(row.match_labels || {}).map(([key, raw]) => {
+      for (const op of ['!=', '=~', '!~'] as const) {
+        if (raw.startsWith(op)) return { key, op, value: raw.slice(op.length) }
+      }
+      return { key, op: '=' as const, value: raw }
+    }),
     pipeline: row.pipeline || '[]',
     notify_configs: row.notify_configs || '[]',
     repeat_interval: row.repeat_interval,
@@ -180,7 +185,10 @@ async function handleSave() {
       name: form.name,
       description: form.description,
       severities: form.severities.join(','),
-      match_labels: Object.fromEntries(form.match_labels.map(m => [m.key, m.value])),
+      match_labels: Object.fromEntries(form.match_labels.map(m => {
+        const v = m.op === '=' ? m.value : `${m.op}${m.value}`
+        return [m.key, v]
+      })),
       pipeline: form.pipeline,
       notify_configs: form.notify_configs,
       repeat_interval: form.repeat_interval,

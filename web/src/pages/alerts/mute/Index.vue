@@ -235,7 +235,12 @@ function openEdit(rule: MuteRule) {
   Object.assign(form, {
     name: rule.name,
     description: rule.description || '',
-    match_labels: Object.entries(rule.match_labels || {}).map(([key, value]) => ({ key, op: '=', value })),
+    match_labels: Object.entries(rule.match_labels || {}).map(([key, raw]) => {
+      for (const op of ['!=', '=~', '!~'] as const) {
+        if (raw.startsWith(op)) return { key, op, value: raw.slice(op.length) }
+      }
+      return { key, op: '=' as const, value: raw }
+    }),
     severities: parseSeverities(rule.severities),
     start_time: rule.start_time ? new Date(rule.start_time).getTime() : null,
     end_time: rule.end_time ? new Date(rule.end_time).getTime() : null,
@@ -260,7 +265,10 @@ async function handleSave() {
     const payload: Partial<MuteRule> = {
       name: form.name,
       description: form.description,
-      match_labels: Object.fromEntries(form.match_labels.map(m => [m.key, m.value])),
+      match_labels: Object.fromEntries(form.match_labels.map(m => {
+        const v = m.op === '=' ? m.value : `${m.op}${m.value}`
+        return [m.key, v]
+      })),
       severities: form.severities.join(','),
       start_time: form.start_time ? new Date(form.start_time).toISOString() : null,
       end_time: form.end_time ? new Date(form.end_time).toISOString() : null,

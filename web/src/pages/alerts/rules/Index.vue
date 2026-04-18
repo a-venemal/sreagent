@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { h, ref, reactive, onMounted, computed } from 'vue'
+import { h, ref, reactive, onMounted, computed, watch } from 'vue'
 import { useMessage, NTag, NButton, NSpace, NPopconfirm } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { alertRuleApi, datasourceApi } from '@/api'
-import type { AlertRule, DataSource, AlertSeverity, QueryResponse } from '@/types'
+import type { AlertRule, DataSource, AlertSeverity, DataSourceType, QueryResponse } from '@/types'
 import { formatTime, kvArrayToRecord } from '@/utils/format'
 import { getSeverityType, getRuleStatusType } from '@/utils/alert'
 import KVEditor from '@/components/common/KVEditor.vue'
@@ -54,6 +54,7 @@ const defaultForm = {
   display_name: '',
   description: '',
   datasource_id: null as number | null,
+  datasource_type: '' as DataSourceType | '',
   expression: '',
   for_duration: '5m',
   severity: 'warning' as AlertSeverity,
@@ -75,9 +76,24 @@ const datasourceOptions = computed(() =>
   datasources.value.map(ds => ({ label: `${ds.name} (${ds.type})`, value: ds.id }))
 )
 
+const datasourceTypeOptions = [
+  { label: 'Prometheus', value: 'prometheus' },
+  { label: 'VictoriaMetrics', value: 'victoriametrics' },
+  { label: 'Zabbix', value: 'zabbix' },
+  { label: 'VictoriaLogs', value: 'victorialogs' },
+]
+
 const selectedDatasource = computed(() =>
   datasources.value.find(ds => ds.id === form.datasource_id)
 )
+
+// When a specific datasource is selected, auto-fill datasource_type
+watch(() => form.datasource_id, (newId) => {
+  if (newId != null) {
+    const ds = datasources.value.find(d => d.id === newId)
+    if (ds) form.datasource_type = ds.type as DataSourceType
+  }
+})
 
 const expressionLang = computed(() => {
   const t = selectedDatasource.value?.type
@@ -223,6 +239,7 @@ function openCreate() {
     display_name: '',
     description: '',
     datasource_id: null,
+    datasource_type: '',
     expression: '',
     for_duration: '5m',
     severity: 'warning',
@@ -243,6 +260,7 @@ function openEdit(rule: AlertRule) {
     display_name: rule.display_name,
     description: rule.description,
     datasource_id: rule.datasource_id,
+    datasource_type: rule.datasource_type || '',
     expression: rule.expression,
     for_duration: rule.for_duration,
     severity: rule.severity,
@@ -264,6 +282,10 @@ async function handleSave() {
     message.warning(t('alert.expressionRequired'))
     return
   }
+  if (form.datasource_id == null && !form.datasource_type) {
+    message.warning(t('alert.datasourceRequired', 'A datasource or datasource type is required'))
+    return
+  }
 
   saving.value = true
   try {
@@ -271,7 +293,8 @@ async function handleSave() {
       name: form.name,
       display_name: form.display_name,
       description: form.description,
-      datasource_id: form.datasource_id!,
+      datasource_id: form.datasource_id,
+      datasource_type: form.datasource_type,
       expression: form.expression,
       for_duration: form.for_duration,
       severity: form.severity,
@@ -467,6 +490,20 @@ onMounted(() => {
               <n-select v-model:value="form.datasource_id" :options="datasourceOptions" :placeholder="t('alert.selectDataSource')" clearable />
             </n-form-item>
           </n-gi>
+          <n-gi>
+            <n-form-item :label="t('alert.datasourceType', 'Datasource Type')">
+              <n-select
+                v-model:value="form.datasource_type"
+                :options="datasourceTypeOptions"
+                :placeholder="t('alert.selectDatasourceType', 'Auto or select type')"
+                :disabled="form.datasource_id != null"
+                clearable
+              />
+            </n-form-item>
+          </n-gi>
+        </n-grid>
+
+        <n-grid :x-gap="12" :cols="2">
           <n-gi>
             <n-form-item :label="t('alert.groupName')">
               <n-input v-model:value="form.group_name" placeholder="e.g. infrastructure" />

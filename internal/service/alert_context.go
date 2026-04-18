@@ -80,10 +80,15 @@ func (b *AlertContextBuilder) enrichWithMetrics(ctx context.Context, alertCtx *A
 		return
 	}
 
-	ds, err := b.dsRepo.GetByID(ctx, rule.DataSourceID)
+	if rule.DataSourceID == nil {
+		b.logger.Warn("alert context: rule has no datasource_id, skipping context query",
+			zap.Uint("rule_id", ruleID))
+		return
+	}
+	ds, err := b.dsRepo.GetByID(ctx, *rule.DataSourceID)
 	if err != nil {
 		b.logger.Warn("alert context: failed to load datasource",
-			zap.Uint("datasource_id", rule.DataSourceID), zap.Error(err))
+			zap.Uint("datasource_id", *rule.DataSourceID), zap.Error(err))
 		return
 	}
 

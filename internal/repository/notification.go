@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"regexp"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -200,12 +202,36 @@ func (r *NotifyRecordRepository) GetLastSentRecord(ctx context.Context, channelI
 	return &record, nil
 }
 
-// labelsMatch checks if all selector labels exist in the target labels with matching values.
+// labelsMatch checks if all selector labels match the target labels.
+// Supports operator-encoded values:
+//   - plain value "foo"   → key = "foo"
+//   - prefix "!=foo"      → key != "foo"
+//   - prefix "=~foo.*"    → key =~ regex "foo.*"
+//   - prefix "!~foo.*"    → key !~ regex "foo.*"
+//
 // An empty selector always matches.
 func labelsMatch(selector, target map[string]string) bool {
-	for k, v := range selector {
-		if tv, ok := target[k]; !ok || tv != v {
-			return false
+	for k, pattern := range selector {
+		tv := target[k]
+		switch {
+		case strings.HasPrefix(pattern, "!~"):
+			re, err := regexp.Compile(pattern[2:])
+			if err != nil || re.MatchString(tv) {
+				return false
+			}
+		case strings.HasPrefix(pattern, "=~"):
+			re, err := regexp.Compile(pattern[2:])
+			if err != nil || !re.MatchString(tv) {
+				return false
+			}
+		case strings.HasPrefix(pattern, "!="):
+			if tv == pattern[2:] {
+				return false
+			}
+		default:
+			if tv != pattern {
+				return false
+			}
 		}
 	}
 	return true

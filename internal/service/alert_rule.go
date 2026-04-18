@@ -30,9 +30,13 @@ func NewAlertRuleService(
 }
 
 func (s *AlertRuleService) Create(ctx context.Context, rule *model.AlertRule) error {
-	// Verify datasource exists
-	if _, err := s.dsRepo.GetByID(ctx, rule.DataSourceID); err != nil {
-		return apperr.WithMessage(apperr.ErrDSNotFound, fmt.Sprintf("datasource ID %d not found", rule.DataSourceID))
+	// Validate datasource: either a specific ID or a type must be provided
+	if rule.DataSourceID != nil {
+		if _, err := s.dsRepo.GetByID(ctx, *rule.DataSourceID); err != nil {
+			return apperr.WithMessage(apperr.ErrDSNotFound, fmt.Sprintf("datasource ID %d not found", *rule.DataSourceID))
+		}
+	} else if rule.DatasourceType == "" {
+		return apperr.WithMessage(apperr.ErrInvalidParam, "either datasource_id or datasource_type must be provided")
 	}
 
 	rule.Version = 1
@@ -72,6 +76,7 @@ func (s *AlertRuleService) Update(ctx context.Context, rule *model.AlertRule) er
 	existing.DisplayName = rule.DisplayName
 	existing.Description = rule.Description
 	existing.DataSourceID = rule.DataSourceID
+	existing.DatasourceType = rule.DatasourceType
 	existing.Expression = rule.Expression
 	existing.ForDuration = rule.ForDuration
 	existing.Severity = rule.Severity

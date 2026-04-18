@@ -73,3 +73,12 @@ func (r *DataSourceRepository) ListEnabled(ctx context.Context) ([]model.DataSou
 	err := r.db.WithContext(ctx).Where("is_enabled = ?", true).Find(&list).Error
 	return list, err
 }
+
+// ListEnabledByType returns all enabled datasources of a specific type.
+func (r *DataSourceRepository) ListEnabledByType(ctx context.Context, dsType model.DataSourceType) ([]model.DataSource, error) {
+	var list []model.DataSource
+	err := r.db.WithContext(ctx).
+		Where("is_enabled = ? AND type = ?", true, dsType).
+		Find(&list).Error
+	return list, err
+}

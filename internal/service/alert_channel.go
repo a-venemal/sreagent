@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"regexp"
 	"strings"
 
 	"go.uber.org/zap"
@@ -110,12 +111,30 @@ func (s *AlertChannelService) FindMatchingChannels(ctx context.Context, event *m
 	return matched, nil
 }
 
-// labelsMatch returns true if all entries in matchLabels exist with the same
-// value in eventLabels (subset match).
+// labelsMatch returns true if all entries in matchLabels match eventLabels.
+// Supports operator-encoded values (!=, =~, !~) in matchLabels values.
 func labelsMatch(matchLabels, eventLabels model.JSONLabels) bool {
-	for k, v := range matchLabels {
-		if eventLabels[k] != v {
-			return false
+	for k, pattern := range matchLabels {
+		tv := eventLabels[k]
+		switch {
+		case strings.HasPrefix(pattern, "!~"):
+			re, err := regexp.Compile(pattern[2:])
+			if err != nil || re.MatchString(tv) {
+				return false
+			}
+		case strings.HasPrefix(pattern, "=~"):
+			re, err := regexp.Compile(pattern[2:])
+			if err != nil || !re.MatchString(tv) {
+				return false
+			}
+		case strings.HasPrefix(pattern, "!="):
+			if tv == pattern[2:] {
+				return false
+			}
+		default:
+			if tv != pattern {
+				return false
+			}
 		}
 	}
 	return true

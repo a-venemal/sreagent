@@ -36,8 +36,9 @@ type AlertRule struct {
 	Name         string     `json:"name" gorm:"size:256;not null;index"`
 	DisplayName  string     `json:"display_name" gorm:"size:256"`
 	Description  string     `json:"description" gorm:"type:text"`
-	DataSourceID uint       `json:"datasource_id" gorm:"index;not null"`
-	DataSource   DataSource `json:"datasource,omitempty" gorm:"foreignKey:DataSourceID"`
+	DataSourceID   *uint          `json:"datasource_id" gorm:"index"`
+	DataSource     *DataSource    `json:"datasource,omitempty" gorm:"foreignKey:DataSourceID"`
+	DatasourceType DataSourceType `json:"datasource_type" gorm:"size:32;index"`
 	// Rule expression (PromQL, LogsQL, Zabbix trigger expression, etc.)
 	Expression string `json:"expression" gorm:"type:text;not null"`
 	// For duration (e.g., "5m" - alert must be firing for this duration)

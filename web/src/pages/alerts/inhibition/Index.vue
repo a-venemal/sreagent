@@ -39,48 +39,12 @@
 
         <!-- Source Match Labels -->
         <n-form-item :label="t('inhibition.sourceMatch')">
-          <div class="label-editor">
-            <div v-for="(_, key) in (formData.source_match ?? {})" :key="key" class="label-row">
-              <n-input :value="key" disabled class="label-key" />
-              <span class="label-sep">=</span>
-              <n-input v-model:value="formData.source_match[key]" class="label-val" />
-              <n-button quaternary circle size="small" @click="removeLabel('source', key)">
-                <template #icon><n-icon :component="CloseOutline" /></template>
-              </n-button>
-            </div>
-            <div class="label-add-row">
-              <n-input v-model:value="newSourceKey" :placeholder="t('common.key')" class="label-key" />
-              <span class="label-sep">=</span>
-              <n-input v-model:value="newSourceVal" :placeholder="t('common.value')" class="label-val" />
-              <n-button quaternary size="small" @click="addLabel('source')">
-                <template #icon><n-icon :component="AddOutline" /></template>
-                {{ t('inhibition.addLabel') }}
-              </n-button>
-            </div>
-          </div>
+          <LabelMatcherEditor v-model:modelValue="formData.source_matchers" :add-label="t('inhibition.addLabel')" />
         </n-form-item>
 
         <!-- Target Match Labels -->
         <n-form-item :label="t('inhibition.targetMatch')">
-          <div class="label-editor">
-            <div v-for="(_, key) in (formData.target_match ?? {})" :key="key" class="label-row">
-              <n-input :value="key" disabled class="label-key" />
-              <span class="label-sep">=</span>
-              <n-input v-model:value="formData.target_match[key]" class="label-val" />
-              <n-button quaternary circle size="small" @click="removeLabel('target', key)">
-                <template #icon><n-icon :component="CloseOutline" /></template>
-              </n-button>
-            </div>
-            <div class="label-add-row">
-              <n-input v-model:value="newTargetKey" :placeholder="t('common.key')" class="label-key" />
-              <span class="label-sep">=</span>
-              <n-input v-model:value="newTargetVal" :placeholder="t('common.value')" class="label-val" />
-              <n-button quaternary size="small" @click="addLabel('target')">
-                <template #icon><n-icon :component="AddOutline" /></template>
-                {{ t('inhibition.addLabel') }}
-              </n-button>
-            </div>
-          </div>
+          <LabelMatcherEditor v-model:modelValue="formData.target_matchers" :add-label="t('inhibition.addLabel')" />
         </n-form-item>
 
         <n-form-item :label="t('inhibition.equalLabels')" :feedback="t('inhibition.equalLabelsHint')">
@@ -109,12 +73,14 @@ import {
   NSpace, NSwitch, NTag, useMessage, useDialog,
 } from 'naive-ui'
 import type { DataTableColumns, FormInst } from 'naive-ui'
-import { AddOutline, CloseOutline, CreateOutline, TrashOutline } from '@vicons/ionicons5'
+import { AddOutline, CreateOutline, TrashOutline } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { inhibitionRuleApi } from '@/api'
 import type { InhibitionRule } from '@/types'
 import PageHeader from '@/components/common/PageHeader.vue'
+import LabelMatcherEditor from '@/components/common/LabelMatcherEditor.vue'
+import type { LabelMatcher } from '@/components/common/LabelMatcherEditor.vue'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -157,12 +123,29 @@ function handlePageChange(page: number) {
 
 onMounted(fetchList)
 
+// ---- Helpers for op-encoded label encoding/decoding ----
+function recordToMatchers(record: Record<string, string>): LabelMatcher[] {
+  return Object.entries(record || {}).map(([key, raw]) => {
+    for (const op of ['!=', '=~', '!~'] as const) {
+      if (raw.startsWith(op)) return { key, op, value: raw.slice(op.length) }
+    }
+    return { key, op: '=', value: raw }
+  })
+}
+
+function matchersToRecord(matchers: LabelMatcher[]): Record<string, string> {
+  return Object.fromEntries(matchers.map(m => {
+    const v = m.op === '=' ? m.value : `${m.op}${m.value}`
+    return [m.key, v]
+  }))
+}
+
 // ---- Modal state ----
 interface InhibitionForm {
   name: string
   description: string
-  source_match: Record<string, string>
-  target_match: Record<string, string>
+  source_matchers: LabelMatcher[]
+  target_matchers: LabelMatcher[]
   equal_labels: string
   is_enabled: boolean
 }
@@ -175,55 +158,17 @@ const formRef = ref<FormInst | null>(null)
 const defaultForm = (): InhibitionForm => ({
   name: '',
   description: '',
-  source_match: {},
-  target_match: {},
+  source_matchers: [],
+  target_matchers: [],
   equal_labels: '',
   is_enabled: true,
 })
 
 const formData = ref<InhibitionForm>(defaultForm())
 
-// Label editor state
-const newSourceKey = ref('')
-const newSourceVal = ref('')
-const newTargetKey = ref('')
-const newTargetVal = ref('')
-
-function addLabel(side: 'source' | 'target') {
-  if (side === 'source') {
-    const k = newSourceKey.value.trim()
-    if (!k) return
-    formData.value.source_match = { ...formData.value.source_match, [k]: newSourceVal.value }
-    newSourceKey.value = ''
-    newSourceVal.value = ''
-  } else {
-    const k = newTargetKey.value.trim()
-    if (!k) return
-    formData.value.target_match = { ...formData.value.target_match, [k]: newTargetVal.value }
-    newTargetKey.value = ''
-    newTargetVal.value = ''
-  }
-}
-
-function removeLabel(side: 'source' | 'target', key: string) {
-  if (side === 'source') {
-    const m = { ...formData.value.source_match }
-    delete m[key]
-    formData.value.source_match = m
-  } else {
-    const m = { ...formData.value.target_match }
-    delete m[key]
-    formData.value.target_match = m
-  }
-}
-
 function openCreate() {
   editingId.value = null
   formData.value = defaultForm()
-  newSourceKey.value = ''
-  newSourceVal.value = ''
-  newTargetKey.value = ''
-  newTargetVal.value = ''
   modalVisible.value = true
 }
 
@@ -232,15 +177,11 @@ function openEdit(row: InhibitionRule) {
   formData.value = {
     name: row.name,
     description: row.description,
-    source_match: { ...(row.source_match ?? {}) },
-    target_match: { ...(row.target_match ?? {}) },
+    source_matchers: recordToMatchers(row.source_match ?? {}),
+    target_matchers: recordToMatchers(row.target_match ?? {}),
     equal_labels: row.equal_labels,
     is_enabled: row.is_enabled,
   }
-  newSourceKey.value = ''
-  newSourceVal.value = ''
-  newTargetKey.value = ''
-  newTargetVal.value = ''
   modalVisible.value = true
 }
 
@@ -252,11 +193,19 @@ async function handleSave() {
   }
   saving.value = true
   try {
+    const payload = {
+      name: formData.value.name,
+      description: formData.value.description,
+      source_match: matchersToRecord(formData.value.source_matchers),
+      target_match: matchersToRecord(formData.value.target_matchers),
+      equal_labels: formData.value.equal_labels,
+      is_enabled: formData.value.is_enabled,
+    }
     if (editingId.value) {
-      await inhibitionRuleApi.update(editingId.value, formData.value)
+      await inhibitionRuleApi.update(editingId.value, payload)
       message.success(t('common.updateSuccess'))
     } else {
-      await inhibitionRuleApi.create(formData.value)
+      await inhibitionRuleApi.create(payload)
       message.success(t('common.createSuccess'))
     }
     modalVisible.value = false
@@ -339,15 +288,5 @@ const columns = computed<DataTableColumns<InhibitionRule>>(() => [
 
 <style scoped>
 .inhibition-page { padding: 0; }
-.label-editor { width: 100%; }
-.label-row, .label-add-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.label-key { flex: 1; }
-.label-val { flex: 1.5; }
-.label-sep { color: #666; font-weight: 600; flex-shrink: 0; }
 .label-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 </style>

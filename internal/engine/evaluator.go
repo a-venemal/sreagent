@@ -205,10 +205,10 @@ func (e *Evaluator) syncRules() {
 					zap.String("name", rule.Name),
 				)
 				e.stopRuleEvaluator(rule.ID)
-				e.startRuleEvaluator(rule, &rule.DataSource)
+				e.startRuleEvaluators(ctx, rule)
 			}
 		} else {
-			e.startRuleEvaluator(rule, &rule.DataSource)
+			e.startRuleEvaluators(ctx, rule)
 		}
 	}
 
@@ -233,7 +233,52 @@ func (e *Evaluator) syncRules() {
 	)
 }
 
-// startRuleEvaluator creates and starts a goroutine for a single rule.
+// startRuleEvaluators dispatches rule evaluation:
+// - If rule.DataSourceID is non-nil, start a single evaluator for that specific datasource.
+// - If rule.DataSourceID is nil and rule.DatasourceType is set, start one evaluator per
+//   enabled datasource matching that type.
+func (e *Evaluator) startRuleEvaluators(ctx context.Context, rule *model.AlertRule) {
+	if rule.DataSourceID != nil {
+		// Specific datasource: use the preloaded DataSource (may be nil if not found)
+		ds := rule.DataSource
+		if ds == nil {
+			e.logger.Warn("rule has datasource_id but DataSource is nil after preload — skipping",
+				zap.Uint("rule_id", rule.ID))
+			return
+		}
+		e.startRuleEvaluator(rule, ds)
+		return
+	}
+
+	// No specific datasource — fan out to all enabled datasources of the declared type.
+	if rule.DatasourceType == "" {
+		e.logger.Warn("rule has no datasource_id and no datasource_type — skipping",
+			zap.Uint("rule_id", rule.ID))
+		return
+	}
+
+	dsList, err := e.dsRepo.ListEnabledByType(ctx, rule.DatasourceType)
+	if err != nil {
+		e.logger.Error("failed to list datasources by type for rule",
+			zap.Uint("rule_id", rule.ID),
+			zap.String("type", string(rule.DatasourceType)),
+			zap.Error(err),
+		)
+		return
+	}
+	if len(dsList) == 0 {
+		e.logger.Warn("no enabled datasources found for rule type",
+			zap.Uint("rule_id", rule.ID),
+			zap.String("type", string(rule.DatasourceType)),
+		)
+		return
+	}
+
+	// Use the first matching datasource. Future: fan-out with composite evaluator key.
+	e.startRuleEvaluator(rule, &dsList[0])
+}
+
+// startRuleEvaluator creates and starts a goroutine for a single rule against a specific datasource.
 func (e *Evaluator) startRuleEvaluator(rule *model.AlertRule, ds *model.DataSource) {
 	re := &RuleEvaluator{
 		rule:        rule,

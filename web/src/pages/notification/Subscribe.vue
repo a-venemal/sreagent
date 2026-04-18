@@ -207,7 +207,12 @@ function openEdit(row: SubscribeRule) {
   Object.assign(form, {
     name: row.name,
     description: row.description,
-    match_labels: Object.entries(row.match_labels || {}).map(([key, value]) => ({ key, op: '=', value })),
+    match_labels: Object.entries(row.match_labels || {}).map(([key, raw]) => {
+      for (const op of ['!=', '=~', '!~'] as const) {
+        if (raw.startsWith(op)) return { key, op, value: raw.slice(op.length) }
+      }
+      return { key, op: '=' as const, value: raw }
+    }),
     severities: (row.severities || '').split(',').filter(Boolean),
     notify_rule_id: row.notify_rule_id,
     subscriber_type: row.team_id ? 'team' : 'user',
@@ -229,7 +234,10 @@ async function handleSave() {
     const payload: Partial<SubscribeRule> = {
       name: form.name,
       description: form.description,
-      match_labels: Object.fromEntries(form.match_labels.map(m => [m.key, m.value])),
+      match_labels: Object.fromEntries(form.match_labels.map(m => {
+        const v = m.op === '=' ? m.value : `${m.op}${m.value}`
+        return [m.key, v]
+      })),
       severities: form.severities.join(','),
       notify_rule_id: form.notify_rule_id || 0,
       user_id: form.subscriber_type === 'user' ? form.user_id : null,

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -139,10 +140,29 @@ func (s *MuteRuleService) matchesRule(rule *model.MuteRule, event *model.AlertEv
 	}
 
 	// 2. Check label matching (alert must match ALL labels in the mute rule)
+	// Supports operator-encoded values (!=, =~, !~) in MatchLabels values.
 	if len(rule.MatchLabels) > 0 {
-		for k, v := range rule.MatchLabels {
-			if eventVal, ok := event.Labels[k]; !ok || eventVal != v {
-				return false
+		for k, pattern := range rule.MatchLabels {
+			tv := event.Labels[k]
+			switch {
+			case strings.HasPrefix(pattern, "!~"):
+				re, err := regexp.Compile(pattern[2:])
+				if err != nil || re.MatchString(tv) {
+					return false
+				}
+			case strings.HasPrefix(pattern, "=~"):
+				re, err := regexp.Compile(pattern[2:])
+				if err != nil || !re.MatchString(tv) {
+					return false
+				}
+			case strings.HasPrefix(pattern, "!="):
+				if tv == pattern[2:] {
+					return false
+				}
+			default:
+				if tv != pattern {
+					return false
+				}
 			}
 		}
 	}

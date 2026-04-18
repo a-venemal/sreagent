@@ -70,7 +70,8 @@ export interface AlertRule {
   name: string
   display_name: string
   description: string
-  datasource_id: number
+  datasource_id: number | null
+  datasource_type: DataSourceType | ''
   datasource?: DataSource
   expression: string
   for_duration: string
