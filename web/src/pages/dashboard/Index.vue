@@ -452,113 +452,68 @@ onMounted(() => {
       </template>
     </n-modal>
 
-    <!-- Top stat cards row -->
-    <n-spin :show="loading">
-      <n-grid :x-gap="16" :y-gap="16" :cols="5" responsive="screen" class="stat-grid" style="margin-bottom: 20px">
-        <n-gi v-for="(card, idx) in statCards" :key="card.key" :style="{ '--sre-stagger-i': idx }">
-          <GlowCard
-            :variant="idx === 0 ? 'critical' : 'default'"
-            :glow="idx === 0 && stats.active_alerts > 0"
-            :conic="idx === 0 ? 'critical' : false"
-            :tilt="true"
-            padding="0"
-            class="stat-card-glow stagger-item"
-          >
-            <div class="stat-card__accent" :style="{ background: card.gradient }" />
-            <div class="stat-card__body">
-              <div class="stat-card__icon" :style="{ background: card.color + '18', color: card.color }">
-                <n-icon :component="card.icon" :size="22" />
-              </div>
-              <div class="stat-card__info">
-                <div class="stat-card__label">{{ t(card.titleKey) }}</div>
-                <AnimatedNumber
-                  :value="stats[card.key]"
-                  class="stat-card__value"
-                />
-              </div>
-            </div>
-          </GlowCard>
-        </n-gi>
+    <!-- ===== Bento Grid ===== -->
+    <div class="bento-grid stagger-grid">
 
-        <!-- Engine status card -->
-        <n-gi :style="{ '--sre-stagger-i': statCards.length }">
-          <GlowCard
-            :variant="engineStatus.running ? 'success' : 'critical'"
-            :glow="!engineStatus.running"
-            :tilt="true"
-            padding="0"
-            class="stat-card-glow stagger-item"
-          >
-            <div class="stat-card__accent" :style="{ background: engineStatus.running ? 'linear-gradient(135deg,#18a058,#0d6e3e)' : 'linear-gradient(135deg,#e88080,#c0392b)' }" />
-            <div class="stat-card__body">
-              <div class="stat-card__icon" :style="{ background: (engineStatus.running ? '#18a058' : '#e88080') + '18', color: engineStatus.running ? '#18a058' : '#e88080' }">
-                <n-icon :component="PulseOutline" :size="22" />
-              </div>
-              <div class="stat-card__info">
-                <div class="stat-card__label">{{ t('engine.title') }}</div>
-                <div class="engine-status-row">
-                  <span class="engine-dot" :class="engineStatus.running ? 'engine-dot--running' : 'engine-dot--stopped'" />
-                  <span class="stat-card__value" style="font-size:18px">
-                    {{ engineStatus.running ? t('engine.running') : t('engine.stopped') }}
-                  </span>
+      <!-- A: Hero — Active Alerts (large, prominent) -->
+      <GlowCard
+        variant="critical"
+        :glow="stats.active_alerts > 0"
+        :conic="stats.active_alerts > 0 ? 'critical' : false"
+        :tilt="true"
+        padding="0"
+        class="bento-hero"
+      >
+        <div class="hero-accent" />
+        <div class="hero-body">
+          <div class="hero-left">
+            <div class="eyebrow" style="color: var(--sre-critical); margin-bottom: 8px">
+              {{ t('dashboard.activeAlerts') }}
+            </div>
+            <div class="hero-number">
+              <AnimatedNumber :value="stats.active_alerts" :duration="1200" class="hero-count" />
+            </div>
+            <div class="hero-sev-bars">
+              <div
+                v-for="sev in ['critical','warning','info']"
+                :key="sev"
+                class="hero-sev-bar"
+                :class="`hero-sev-bar--${sev}`"
+              >
+                <span class="hero-sev-label">{{ t(`alert.${sev}`) }}</span>
+                <div class="hero-sev-track">
+                  <div
+                    class="hero-sev-fill"
+                    :style="{
+                      width: stats.active_alerts
+                        ? ((stats.severity_breakdown?.[sev as keyof typeof stats.severity_breakdown] ?? 0) / stats.active_alerts * 100) + '%'
+                        : '0%'
+                    }"
+                  />
                 </div>
-                <div class="engine-meta">{{ engineStatus.total_rules }} {{ t('engine.rulesUnit') }} · {{ engineStatus.active_alerts }} {{ t('engine.activeUnit') }}</div>
+                <span class="hero-sev-count number-display">{{ stats.severity_breakdown?.[sev as keyof typeof stats.severity_breakdown] ?? 0 }}</span>
               </div>
             </div>
-          </GlowCard>
-        </n-gi>
-      </n-grid>
-    </n-spin>
-
-    <!-- Middle row: charts + MTTA/MTTR -->
-    <n-grid :x-gap="16" :y-gap="16" :cols="12" style="margin-bottom: 20px">
-
-      <!-- Severity breakdown chart -->
-      <n-gi :span="4">
-        <div class="panel-card">
-          <div class="panel-card__header">
-            <span class="panel-card__title">{{ t('dashboard.severityDistribution') }}</span>
           </div>
-          <div class="chart-donut-wrap">
-            <v-chart :option="severityChartOption" autoresize style="height:180px" />
-          </div>
-          <div class="sev-legend">
-            <div class="sev-item">
-              <span class="sev-dot sev-dot--critical" />
-              <span class="sev-label">{{ t('alert.critical') }}</span>
-              <span class="sev-count">{{ stats.severity_breakdown?.critical ?? 0 }}</span>
-            </div>
-            <div class="sev-item">
-              <span class="sev-dot sev-dot--warning" />
-              <span class="sev-label">{{ t('alert.warning') }}</span>
-              <span class="sev-count">{{ stats.severity_breakdown?.warning ?? 0 }}</span>
-            </div>
-            <div class="sev-item">
-              <span class="sev-dot sev-dot--info" />
-              <span class="sev-label">{{ t('alert.info') }}</span>
-              <span class="sev-count">{{ stats.severity_breakdown?.info ?? 0 }}</span>
-            </div>
+          <div class="hero-right">
+            <n-icon :component="AlertCircleOutline" :size="56" style="opacity:0.12; color: var(--sre-critical)" />
           </div>
         </div>
-      </n-gi>
+      </GlowCard>
 
-      <!-- MTTA/MTTR analytics: P50 hero + mean/P95 + severity breakdown -->
-      <n-gi :span="5">
-        <div class="panel-card mttr-card">
-          <div class="panel-card__header mttr-card__header">
-            <div class="mttr-card__title-row">
-              <n-icon :component="TimeOutline" size="15" />
-              <span class="panel-card__title">MTTA / MTTR</span>
-            </div>
-            <n-radio-group v-model:value="mttrWindow" size="small" @update:value="fetchMTTRStats">
-              <n-radio-button v-for="opt in mttrWindowOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </n-radio-button>
-            </n-radio-group>
+      <!-- B: MTTA/MTTR (tall right column) -->
+      <GlowCard variant="default" :tilt="true" padding="0" class="bento-mtt">
+        <div class="panel-card__header mttr-card__header" style="padding: 16px 20px 12px">
+          <div class="mttr-card__title-row">
+            <n-icon :component="TimeOutline" size="14" />
+            <span class="panel-card__title">MTTA / MTTR</span>
           </div>
-
-          <n-spin :show="mttrLoading">
-            <!-- Two hero blocks: MTTA + MTTR, each with P50 + mean/P95 + count -->
+          <n-radio-group v-model:value="mttrWindow" size="small" @update:value="fetchMTTRStats">
+            <n-radio-button v-for="opt in mttrWindowOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</n-radio-button>
+          </n-radio-group>
+        </div>
+        <n-spin :show="mttrLoading">
+          <div style="padding: 0 20px 16px">
             <div class="mttr-hero">
               <div class="mttr-metric mttr-metric--ack">
                 <div class="mttr-metric__eyebrow">MTTA · P50</div>
@@ -568,13 +523,8 @@ onMounted(() => {
                   <span class="mttr-metric__dot">·</span>
                   <span class="mttr-metric__sub"><em>P95</em> {{ fmtDuration(mttrStats.mtta.p95) }}</span>
                 </div>
-                <div class="mttr-metric__count">
-                  <span class="number-display">{{ mttrStats.mtta.count }}</span> {{ t('dashboard.ackedCount') }}
-                </div>
               </div>
-
               <div class="mttr-hero__divider" />
-
               <div class="mttr-metric mttr-metric--resolve">
                 <div class="mttr-metric__eyebrow">MTTR · P50</div>
                 <div class="mttr-metric__value number-display">{{ fmtDuration(mttrStats.mttr.p50) }}</div>
@@ -583,112 +533,116 @@ onMounted(() => {
                   <span class="mttr-metric__dot">·</span>
                   <span class="mttr-metric__sub"><em>P95</em> {{ fmtDuration(mttrStats.mttr.p95) }}</span>
                 </div>
-                <div class="mttr-metric__count">
-                  <span class="number-display">{{ mttrStats.mttr.count }}</span> {{ t('dashboard.resolvedCount') }}
-                </div>
               </div>
             </div>
-
-            <!-- Per-severity breakdown strip -->
-            <div class="mttr-sev">
+            <div class="mttr-sev" style="margin-top:12px">
               <div class="mttr-sev__head eyebrow">{{ t('dashboard.bySeverity') }}</div>
-              <div
-                v-for="sev in mttrStats.by_severity"
-                :key="sev.severity"
-                class="mttr-sev__row"
-                :class="`mttr-sev__row--${sev.severity}`"
-              >
+              <div v-for="sev in mttrStats.by_severity" :key="sev.severity" class="mttr-sev__row" :class="`mttr-sev__row--${sev.severity}`">
                 <span class="mttr-sev__tag">{{ sevLabel(sev.severity) }}</span>
-                <div class="mttr-sev__metric">
-                  <span class="mttr-sev__label">MTTA</span>
-                  <span class="mttr-sev__val number-display">{{ fmtDuration(sev.mtta.mean) }}</span>
-                </div>
-                <div class="mttr-sev__metric">
-                  <span class="mttr-sev__label">MTTR</span>
-                  <span class="mttr-sev__val number-display">{{ fmtDuration(sev.mttr.mean) }}</span>
-                </div>
-                <div class="mttr-sev__count number-display">{{ sev.mttr.count }}</div>
+                <div class="mttr-sev__metric"><span class="mttr-sev__label">MTTA</span><span class="mttr-sev__val number-display">{{ fmtDuration(sev.mtta.mean) }}</span></div>
+                <div class="mttr-sev__metric"><span class="mttr-sev__label">MTTR</span><span class="mttr-sev__val number-display">{{ fmtDuration(sev.mttr.mean) }}</span></div>
               </div>
             </div>
-          </n-spin>
-        </div>
-      </n-gi>
-
-      <!-- Users / Teams mini cards -->
-      <n-gi :span="3">
-        <div style="display:flex;flex-direction:column;gap:16px;height:100%">
-          <div class="mini-stat-card">
-            <div class="mini-stat-card__icon" style="background:#a855f718;color:#a855f7">
-              <n-icon :component="PeopleOutline" :size="20" />
-            </div>
-            <div>
-              <div class="mini-stat-label">{{ t('dashboard.totalUsers') }}</div>
-              <div class="mini-stat-value">{{ stats.total_users }}</div>
-            </div>
           </div>
-          <div class="mini-stat-card">
-            <div class="mini-stat-card__icon" style="background:#06b6d418;color:#06b6d4">
-              <n-icon :component="LayersOutline" :size="20" />
-            </div>
-            <div>
-              <div class="mini-stat-label">{{ t('dashboard.totalTeams') }}</div>
-              <div class="mini-stat-value">{{ stats.total_teams }}</div>
-            </div>
+        </n-spin>
+      </GlowCard>
+
+      <!-- C-F: Small stat cards -->
+      <GlowCard v-for="(card, idx) in statCards" :key="card.key"
+        variant="default" :tilt="true" padding="0"
+        :style="{ '--sre-stagger-i': idx + 2 }"
+        class="bento-stat stagger-item"
+      >
+        <div class="stat-card__accent" :style="{ background: card.gradient }" />
+        <div class="stat-card__body">
+          <div class="stat-card__icon" :style="{ background: card.color + '18', color: card.color }">
+            <n-icon :component="card.icon" :size="20" />
+          </div>
+          <div class="stat-card__info">
+            <div class="stat-card__label">{{ t(card.titleKey) }}</div>
+            <AnimatedNumber :value="stats[card.key]" class="stat-card__value" style="font-size:22px" />
           </div>
         </div>
-      </n-gi>
-    </n-grid>
+      </GlowCard>
 
-    <!-- MTTR Trend full-width card -->
-    <n-grid :x-gap="16" :y-gap="16" :cols="12" style="margin-bottom: 20px">
-      <n-gi :span="12">
-        <div class="panel-card">
-          <div class="panel-card__header" style="justify-content:space-between">
-            <div style="display:flex;align-items:center;gap:6px">
-              <n-icon :component="TimeOutline" size="15" />
-              <span class="panel-card__title">{{ t('dashboard.mttrTrend') }}</span>
-            </div>
-            <n-radio-group v-model:value="mttrTrendDays" size="small" @update:value="fetchMTTRTrend">
-              <n-radio-button v-for="opt in mttrTrendDayOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label() }}
-              </n-radio-button>
-            </n-radio-group>
+      <!-- G: Engine status -->
+      <GlowCard
+        :variant="engineStatus.running ? 'success' : 'critical'"
+        :glow="!engineStatus.running"
+        :tilt="true"
+        padding="0"
+        :style="{ '--sre-stagger-i': statCards.length + 2 }"
+        class="bento-stat stagger-item"
+      >
+        <div class="stat-card__accent" :style="{ background: engineStatus.running ? 'linear-gradient(135deg,#18a058,#0d6e3e)' : 'linear-gradient(135deg,#e88080,#c0392b)' }" />
+        <div class="stat-card__body">
+          <div class="stat-card__icon" :style="{ background: (engineStatus.running ? '#18a058' : '#e88080') + '18', color: engineStatus.running ? '#18a058' : '#e88080' }">
+            <n-icon :component="PulseOutline" :size="20" />
           </div>
-          <n-spin :show="mttrTrendLoading">
-            <v-chart :option="mttrTrendChartOption" autoresize style="height: 260px" />
-          </n-spin>
+          <div class="stat-card__info">
+            <div class="stat-card__label">{{ t('engine.title') }}</div>
+            <div class="engine-status-row">
+              <span class="engine-dot" :class="engineStatus.running ? 'engine-dot--running' : 'engine-dot--stopped'" />
+              <span class="stat-card__value" style="font-size:16px">{{ engineStatus.running ? t('engine.running') : t('engine.stopped') }}</span>
+            </div>
+          </div>
         </div>
-      </n-gi>
-    </n-grid>
+      </GlowCard>
 
-    <!-- Trend Charts Row -->
-    <div class="trend-header">
-      <n-radio-group v-model:value="trendDays" size="small" @update:value="fetchTrendData">
-        <n-radio-button v-for="opt in trendDayOptions" :key="opt.value" :value="opt.value">
-          {{ opt.label() }}
-        </n-radio-button>
-      </n-radio-group>
+      <!-- H: Severity Donut -->
+      <div class="panel-card bento-donut">
+        <div class="panel-card__header">
+          <span class="panel-card__title">{{ t('dashboard.severityDistribution') }}</span>
+        </div>
+        <v-chart :option="severityChartOption" autoresize style="height:160px" />
+        <div class="sev-legend">
+          <div v-for="s in ['critical','warning','info']" :key="s" class="sev-item">
+            <span class="sev-dot" :class="`sev-dot--${s}`" />
+            <span class="sev-label">{{ t(`alert.${s}`) }}</span>
+            <span class="sev-count">{{ stats.severity_breakdown?.[s as keyof typeof stats.severity_breakdown] ?? 0 }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- I: MTTR Trend -->
+      <div class="panel-card bento-trend">
+        <div class="panel-card__header" style="justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:6px">
+            <n-icon :component="TimeOutline" size="14" />
+            <span class="panel-card__title">{{ t('dashboard.mttrTrend') }}</span>
+          </div>
+          <n-radio-group v-model:value="mttrTrendDays" size="small" @update:value="fetchMTTRTrend">
+            <n-radio-button v-for="opt in mttrTrendDayOptions" :key="opt.value" :value="opt.value">{{ opt.label() }}</n-radio-button>
+          </n-radio-group>
+        </div>
+        <n-spin :show="mttrTrendLoading">
+          <v-chart :option="mttrTrendChartOption" autoresize style="height:220px" />
+        </n-spin>
+      </div>
+
+      <!-- J: Alert Trend + Top Rules row -->
+      <div class="panel-card bento-alert-trend">
+        <div class="panel-card__header" style="justify-content:space-between">
+          <span class="panel-card__title">{{ t('dashboard.alertTrend') }}</span>
+          <n-radio-group v-model:value="trendDays" size="small" @update:value="fetchTrendData">
+            <n-radio-button v-for="opt in trendDayOptions" :key="opt.value" :value="opt.value">{{ opt.label() }}</n-radio-button>
+          </n-radio-group>
+        </div>
+        <n-spin :show="trendLoading">
+          <v-chart :option="trendChartOption" autoresize style="height:250px" />
+        </n-spin>
+      </div>
+
+      <div class="panel-card bento-top-rules">
+        <div class="panel-card__header">
+          <span class="panel-card__title">{{ t('dashboard.topRules') }}</span>
+        </div>
+        <n-spin :show="trendLoading">
+          <v-chart :option="topRulesChartOption" autoresize style="height:250px" />
+        </n-spin>
+      </div>
+
     </div>
-    <n-spin :show="trendLoading">
-      <n-grid :x-gap="16" :y-gap="16" :cols="12" style="margin-bottom: 20px">
-        <n-gi :span="8">
-          <div class="panel-card">
-            <div class="panel-card__header">
-              <span class="panel-card__title">{{ t('dashboard.alertTrend') }}</span>
-            </div>
-            <v-chart :option="trendChartOption" autoresize style="height: 300px" />
-          </div>
-        </n-gi>
-        <n-gi :span="4">
-          <div class="panel-card">
-            <div class="panel-card__header">
-              <span class="panel-card__title">{{ t('dashboard.topRules') }}</span>
-            </div>
-            <v-chart :option="topRulesChartOption" autoresize style="height: 300px" />
-          </div>
-        </n-gi>
-      </n-grid>
-    </n-spin>
 
     <!-- Recent Alerts Table -->
     <div class="panel-card">
@@ -731,17 +685,98 @@ onMounted(() => {
   max-width: 1440px;
 }
 
-/* ===== Stat Cards ===== */
-/* stagger-item: driven by --sre-stagger-i on parent n-gi */
+/* ===== Bento Grid ===== */
+.bento-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1.15fr 1fr 1fr 1fr 0.9fr;
+  grid-template-rows: auto auto auto auto;
+  grid-template-areas:
+    "hero hero mtt  mtt  mtt"
+    "s1   s2   s3   s4   s5"
+    "dnt  dnt  trnd trnd trnd"
+    "atr  atr  atr  tpr  tpr";
+  margin-bottom: 20px;
+}
+
+.bento-hero       { grid-area: hero; overflow: hidden; }
+.bento-mtt        { grid-area: mtt;  overflow: hidden; }
+.bento-stat       { overflow: hidden; }
+.bento-stat:nth-child(3) { grid-area: s1; }
+.bento-stat:nth-child(4) { grid-area: s2; }
+.bento-stat:nth-child(5) { grid-area: s3; }
+.bento-stat:nth-child(6) { grid-area: s4; }
+.bento-stat:nth-child(7) { grid-area: s5; }
+.bento-donut      { grid-area: dnt; }
+.bento-trend      { grid-area: trnd; }
+.bento-alert-trend { grid-area: atr; }
+.bento-top-rules  { grid-area: tpr; }
+
+/* Responsive: ≤ 1280px  */
+@media (max-width: 1280px) {
+  .bento-grid {
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-areas:
+      "hero hero mtt"
+      "s1   s2   mtt"
+      "s3   s4   s5"
+      "dnt  trnd trnd"
+      "atr  atr  tpr";
+  }
+}
+@media (max-width: 768px) {
+  .bento-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "hero" "mtt" "s1" "s2" "s3" "s4" "s5"
+      "dnt" "trnd" "atr" "tpr";
+  }
+}
+
+/* Stagger entrance */
 .stagger-item {
   animation: sre-slide-up var(--sre-duration-slow) var(--sre-ease-out) both;
   animation-delay: calc(var(--sre-stagger-i, 0) * 55ms);
 }
+.bento-hero  { animation: sre-slide-up 400ms var(--sre-ease-spring) 0ms both; }
+.bento-mtt   { animation: sre-slide-up 400ms var(--sre-ease-spring) 60ms both; }
+.bento-donut { animation: sre-slide-up 360ms var(--sre-ease-out) 220ms both; }
+.bento-trend { animation: sre-slide-up 360ms var(--sre-ease-out) 280ms both; }
 
-/* GlowCard wrapper — overflow hidden so accent bar clips */
-.stat-card-glow {
-  overflow: hidden;
+/* Hero card internals */
+.hero-accent {
+  height: 4px;
+  background: linear-gradient(90deg, #ef4444, #f59e0b, #ef4444);
+  background-size: 200% 100%;
+  animation: sre-shimmer 3s linear infinite;
 }
+.hero-body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 20px 20px;
+  gap: 16px;
+}
+.hero-left { flex: 1; min-width: 0; }
+.hero-right { flex-shrink: 0; align-self: center; }
+.hero-count {
+  font-size: clamp(48px, 6vw, 72px) !important;
+  font-weight: var(--sre-fw-bold) !important;
+  line-height: 1 !important;
+  letter-spacing: -0.04em !important;
+  color: var(--sre-text-primary);
+  display: block;
+  margin-bottom: 12px;
+}
+.hero-sev-bars { display: flex; flex-direction: column; gap: 6px; }
+.hero-sev-bar  { display: flex; align-items: center; gap: 8px; }
+.hero-sev-label { font-size: var(--sre-fs-xs); color: var(--sre-text-tertiary); width: 48px; flex-shrink: 0; text-transform: capitalize; }
+.hero-sev-track { flex: 1; height: 4px; border-radius: 999px; background: var(--sre-bg-elevated); overflow: hidden; }
+.hero-sev-fill  { height: 100%; border-radius: 999px; transition: width 1s var(--sre-ease-out); }
+.hero-sev-bar--critical .hero-sev-fill { background: var(--sre-critical); }
+.hero-sev-bar--warning  .hero-sev-fill { background: var(--sre-warning); }
+.hero-sev-bar--info     .hero-sev-fill { background: var(--sre-info); }
+.hero-sev-count { font-size: var(--sre-fs-xs); color: var(--sre-text-secondary); width: 24px; text-align: right; font-family: var(--sre-font-mono); }
 .stat-card__accent {
   height: 3px;
   width: 100%;

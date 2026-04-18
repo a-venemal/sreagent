@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, h, inject, onMounted, onUnmounted } from 'vue'
+import CommandPalette from '@/components/common/CommandPalette.vue'
+import { useCommandPalette } from '@/composables/useCommandPalette'
 import type { Ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { NIcon, useMessage } from 'naive-ui'
@@ -31,7 +33,23 @@ const authStore = useAuthStore()
 const { t, locale } = useI18n()
 const message = useMessage()
 
-const collapsed = ref(false)
+// Icon Rail: default collapsed (72px icon rail), persist preference
+const collapsed = ref(JSON.parse(localStorage.getItem('sre-sider-collapsed') ?? 'true'))
+watch(collapsed, v => localStorage.setItem('sre-sider-collapsed', JSON.stringify(v)))
+
+// Hover-to-expand behaviour
+let hoverExpandTimer = 0
+function onSiderEnter() {
+  if (!collapsed.value) return
+  hoverExpandTimer = window.setTimeout(() => { collapsed.value = false }, 180)
+}
+function onSiderLeave() {
+  clearTimeout(hoverExpandTimer)
+  if (collapsed.value) return
+  collapsed.value = true
+}
+
+const { open: openPalette } = useCommandPalette()
 
 const isDark = inject<Ref<boolean>>('isDark', ref(true))
 const toggleTheme = inject<() => void>('toggleTheme', () => {})
@@ -383,19 +401,19 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
 <template>
   <n-layout has-sider style="height: 100vh">
 
-    <!-- ===== Sidebar ===== -->
+    <!-- ===== Icon Rail Sidebar ===== -->
     <n-layout-sider
       class="sre-sider"
       bordered
       collapse-mode="width"
       :collapsed-width="64"
-      :width="240"
+      :width="224"
       :collapsed="collapsed"
-      show-trigger
-      @collapse="collapsed = true"
-      @expand="collapsed = false"
       :native-scrollbar="false"
+      @mouseenter="onSiderEnter"
+      @mouseleave="onSiderLeave"
     >
+      <!-- Logo area -->
       <div class="sider-logo" :class="{ collapsed }">
         <img src="/logo.svg" alt="SREAgent" class="logo-mark" />
         <transition name="fade">
@@ -405,21 +423,42 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
         </transition>
       </div>
 
+      <!-- Navigation menu -->
       <n-menu
         class="sre-menu"
         :collapsed="collapsed"
         :collapsed-width="64"
         :collapsed-icon-size="22"
-        :indent="20"
+        :indent="18"
         :options="menuOptions"
         :value="menuSelectedKey"
         @update:value="handleMenuClick"
       />
 
-      <div v-if="!collapsed" class="sider-footer">
-        <span class="eyebrow">v1.3.1</span>
+      <!-- Bottom: ⌘K trigger + version -->
+      <div class="sider-bottom">
+        <div
+          class="sider-cmd-btn"
+          :class="{ collapsed }"
+          @click="openPalette"
+          :title="collapsed ? '⌘K' : undefined"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="cmd-icon">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <transition name="fade">
+            <span v-if="!collapsed" class="sider-cmd-label">
+              Search <kbd>⌘K</kbd>
+            </span>
+          </transition>
+        </div>
+        <transition name="fade">
+          <div v-if="!collapsed" class="sider-version">v1.8.0</div>
+        </transition>
       </div>
     </n-layout-sider>
+
+    <CommandPalette />
 
     <!-- ===== Right: header + content ===== -->
     <n-layout>
@@ -476,6 +515,16 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
               </div>
             </div>
           </n-popover>
+
+          <div class="header-sep" />
+
+          <!-- ① Search / ⌘K -->
+          <div class="ctrl-btn ctrl-btn--search" @click="openPalette" title="⌘K">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <kbd class="cmd-shortcut">⌘K</kbd>
+          </div>
 
           <div class="header-sep" />
 
@@ -686,27 +735,43 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
 </template>
 
 <style scoped>
-/* ===== Sidebar shell ===== */
+/* ===== Icon Rail Sidebar ===== */
 .sre-sider {
   background:
-    linear-gradient(180deg, rgba(24,160,88,0.05) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(24,160,88,0.06) 0%, transparent 50%),
     var(--sre-bg-card);
   border-right: 1px solid var(--sre-border);
   position: relative;
+  /* Smooth width transition for hover expand */
+  transition: width 220ms var(--sre-ease-out) !important;
+}
+
+/* Noise grain on sider */
+.sre-sider::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--sre-noise-url);
+  opacity: 0.03;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .sider-logo {
   display: flex;
   align-items: center;
   gap: var(--sre-space-3);
-  padding: 16px 20px;
+  padding: 14px 18px;
   height: 60px;
   border-bottom: 1px solid var(--sre-border);
   transition: padding var(--sre-duration-base) var(--sre-ease-out);
+  position: relative;
+  z-index: 1;
 }
 .sider-logo.collapsed {
   justify-content: center;
-  padding: 16px;
+  padding: 14px 12px;
 }
 .logo-mark {
   width: 32px;
@@ -714,11 +779,11 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
   border-radius: var(--sre-radius-md);
   flex-shrink: 0;
   display: block;
-  filter: drop-shadow(0 4px 14px rgba(24, 160, 88, 0.45));
+  filter: drop-shadow(0 4px 16px rgba(24, 160, 88, 0.50));
   position: relative;
 }
 .logo-text {
-  font-size: var(--sre-fs-xl);
+  font-size: var(--sre-fs-lg);
   font-weight: var(--sre-fw-semibold);
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -726,22 +791,123 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
 }
 
 .sre-menu {
-  padding: var(--sre-space-3) var(--sre-space-3);
+  padding: var(--sre-space-2) var(--sre-space-2);
+  position: relative;
+  z-index: 1;
 }
 
-.sider-footer {
+/* Active menu item — left accent bar */
+.sre-menu :deep(.n-menu-item-content--selected)::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--sre-gradient-brand);
+}
+.sre-menu :deep(.n-menu-item-content) {
+  position: relative;
+  overflow: visible;
+}
+
+/* Bottom area: ⌘K + version */
+.sider-bottom {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 12px;
-  padding: 0 24px;
+  bottom: 0;
+  padding: var(--sre-space-3);
+  border-top: 1px solid var(--sre-border);
   display: flex;
-  justify-content: center;
-  opacity: 0.55;
+  flex-direction: column;
+  gap: var(--sre-space-2);
+  background: var(--sre-bg-card);
+  z-index: 1;
 }
-.sider-footer .eyebrow {
-  font-size: var(--sre-fs-2xs);
+
+.sider-cmd-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--sre-radius-md);
+  cursor: pointer;
+  transition: background var(--sre-duration-base) var(--sre-ease-out),
+              box-shadow var(--sre-duration-base) var(--sre-ease-out);
   color: var(--sre-text-tertiary);
+  border: 1px solid var(--sre-border);
+  background: var(--sre-bg-sunken);
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sider-cmd-btn.collapsed {
+  justify-content: center;
+}
+.sider-cmd-btn:hover {
+  background: var(--sre-primary-soft);
+  border-color: var(--sre-primary-ring);
+  color: var(--sre-primary);
+}
+.cmd-icon { flex-shrink: 0; }
+.sider-cmd-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  font-size: var(--sre-fs-sm);
+  font-weight: var(--sre-fw-medium);
+}
+.sider-cmd-label kbd {
+  font-size: var(--sre-fs-2xs);
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--sre-bg-elevated);
+  border: 1px solid var(--sre-border-strong);
+  color: var(--sre-text-muted);
+  font-family: var(--sre-font-mono);
+}
+
+.sider-version {
+  text-align: center;
+  font-size: var(--sre-fs-2xs);
+  color: var(--sre-text-muted);
+  letter-spacing: 0.05em;
+  padding-bottom: 2px;
+}
+
+/* ⌘K trigger in header */
+.ctrl-btn--search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--sre-radius-pill);
+  border: 1px solid var(--sre-border);
+  background: var(--sre-bg-sunken);
+  color: var(--sre-text-tertiary);
+  cursor: pointer;
+  transition: background var(--sre-duration-base) var(--sre-ease-out),
+              border-color var(--sre-duration-base) var(--sre-ease-out),
+              color var(--sre-duration-base) var(--sre-ease-out);
+  font-size: var(--sre-fs-sm);
+}
+.ctrl-btn--search:hover {
+  background: var(--sre-primary-soft);
+  border-color: var(--sre-primary-ring);
+  color: var(--sre-primary);
+}
+.cmd-shortcut {
+  font-size: var(--sre-fs-2xs);
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--sre-bg-elevated);
+  border: 1px solid var(--sre-border-strong);
+  color: var(--sre-text-muted);
+  font-family: var(--sre-font-mono);
+  pointer-events: none;
 }
 
 /* ===== Header bar ===== */

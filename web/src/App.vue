@@ -205,6 +205,10 @@ watch(isDark, (val) => {
 provide('toggleTheme', () => {
   isDark.value = !isDark.value
 })
+
+// View Transitions API CSS keyframes live in global.css.
+// The existing Vue <transition name="sre-page"> provides the actual animation;
+// browsers that support ::view-transition-* will additionally enhance it.
 provide('isDark', isDark)
 </script>
 

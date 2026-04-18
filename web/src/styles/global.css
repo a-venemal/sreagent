@@ -599,6 +599,42 @@ body.light-theme .noise-overlay::after { opacity: 0.025; }
 .glow-success  { box-shadow: var(--sre-shadow-glow-success); }
 .glow-accent   { box-shadow: var(--sre-shadow-glow-accent); }
 
+/* ============================================================
+   Scroll Reveal (Step 3)
+   ============================================================ */
+[data-reveal="out"] {
+  opacity: 0;
+  transform: translateY(22px);
+}
+[data-reveal="in"] {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 500ms var(--sre-ease-out),
+    transform 500ms var(--sre-ease-spring);
+}
+
+/* ============================================================
+   View Transitions (Step 3)
+   ============================================================ */
+@keyframes sre-vt-fade-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-6px) scale(0.99); }
+}
+@keyframes sre-vt-fade-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@supports (view-transition-name: none) {
+  ::view-transition-old(root) {
+    animation: sre-vt-fade-out 200ms var(--sre-ease-out);
+  }
+  ::view-transition-new(root) {
+    animation: sre-vt-fade-in 280ms var(--sre-ease-spring);
+  }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -608,4 +644,5 @@ body.light-theme .noise-overlay::after { opacity: 0.025; }
     scroll-behavior: auto !important;
   }
   .conic-border::before { animation: none !important; opacity: 0.3 !important; }
+  [data-reveal="out"] { opacity: 1; transform: none; }
 }
