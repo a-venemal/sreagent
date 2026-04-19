@@ -9,6 +9,10 @@ import (
 )
 
 // renderActionPage generates the HTML page for alert actions.
+//
+// preAction: optional query-string hint from the Lark card (e.g. "silence")
+//            so the dropdown is pre-selected.
+// preDuration: optional minute hint. 0 means "no hint, let the user pick".
 func renderActionPage(event *model.AlertEvent, token, preAction string, preDuration int) string {
 	// Build labels display
 	var labelsHTML strings.Builder
@@ -55,7 +59,10 @@ func renderActionPage(event *model.AlertEvent, token, preAction string, preDurat
 		});`, html.EscapeString(preAction))
 	}
 
-	preDurationValue := ""
+	// Default the minute input to 60 when nothing was pre-supplied — a sane
+	// starting point that still lets the user adjust via the preset chips or
+	// manually type in any value up to 43200 (30 days).
+	preDurationValue := "60"
 	if preDuration > 0 {
 		preDurationValue = fmt.Sprintf("%d", preDuration)
 	}
@@ -84,15 +91,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .label { background: #f0f5ff; color: #1890ff; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
 .form-group { margin-bottom: 16px; }
 .form-group label { display: block; font-size: 14px; color: #666; margin-bottom: 6px; }
-.form-group select, .form-group input, .form-group textarea { width: 100%%; padding: 10px 12px; border: 1px solid #d9d9d9; border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+.form-group select, .form-group input, .form-group textarea { width: 100%%; padding: 10px 12px; border: 1px solid #d9d9d9; border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.2s; background: #fff; color: #333; }
+.form-group input[readonly] { background: #f5f7fa; color: #666; }
 .form-group select:focus, .form-group input:focus, .form-group textarea:focus { border-color: #1890ff; }
 .form-group textarea { resize: vertical; min-height: 60px; }
+.preset-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.preset-chip { padding: 6px 12px; border: 1px solid #d9d9d9; border-radius: 16px; background: #fff; font-size: 12px; cursor: pointer; transition: all 0.15s; user-select: none; }
+.preset-chip:hover { border-color: #1890ff; color: #1890ff; }
+.preset-chip.active { background: #1890ff; border-color: #1890ff; color: #fff; }
+.duration-hint { margin-top: 6px; font-size: 12px; color: #999; }
+.identity-hint { display: none; margin-top: 4px; font-size: 12px; color: #52c41a; }
+.identity-hint.visible { display: block; }
 .btn { width: 100%%; padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
 .btn:active { opacity: 0.8; }
 .btn-primary { background: #1890ff; color: #fff; }
 .btn-primary:hover { background: #40a9ff; }
 .btn:disabled { background: #d9d9d9; cursor: not-allowed; }
 #duration-group { display: none; }
+.extra-link { display: block; text-align: center; margin-top: 12px; font-size: 13px; color: #1890ff; text-decoration: none; }
+.extra-link:hover { text-decoration: underline; }
 .brand { text-align: center; color: #bbb; font-size: 12px; margin-top: 24px; }
 </style>
 </head>
@@ -124,13 +141,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       </div>
 
       <div class="form-group" id="duration-group">
-        <label for="duration">静默时长（分钟）</label>
-        <input type="number" name="duration" id="duration" value="%s" min="1" max="10080" placeholder="60">
+        <label for="duration">静默时长（分钟，最长 30 天 = 43200）</label>
+        <input type="number" name="duration" id="duration" value="%s" min="1" max="43200" placeholder="60">
+        <div class="preset-chips" id="preset-chips">
+          <span class="preset-chip" data-minutes="30">30 分钟</span>
+          <span class="preset-chip" data-minutes="120">2 小时</span>
+          <span class="preset-chip" data-minutes="480">8 小时</span>
+          <span class="preset-chip" data-minutes="1440">1 天</span>
+          <span class="preset-chip" data-minutes="4320">3 天</span>
+          <span class="preset-chip" data-minutes="10080">7 天</span>
+          <span class="preset-chip" data-minutes="43200">30 天</span>
+        </div>
+        <div class="duration-hint">也可直接在上方输入自定义分钟数，最长 30 天（43200 分钟）</div>
       </div>
 
       <div class="form-group">
         <label for="operator_name">操作人</label>
         <input type="text" name="operator_name" id="operator_name" placeholder="请输入姓名" required>
+        <div class="identity-hint" id="identity-hint">✓ 已自动识别当前登录用户</div>
       </div>
 
       <div class="form-group">
@@ -139,6 +167,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       </div>
 
       <button type="submit" class="btn btn-primary" id="submit-btn">提交</button>
+      <a href="/alerts/mute-rules" class="extra-link" target="_blank" rel="noopener">需要创建持久静默规则？前往平台配置 →</a>
     </form>
   </div>
 
@@ -150,7 +179,69 @@ function toggleDuration() {
   var action = document.getElementById('action').value;
   var dg = document.getElementById('duration-group');
   dg.style.display = action === 'silence' ? 'block' : 'none';
+  if (action === 'silence') { syncActiveChip(); }
 }
+
+// Preset chip <-> input two-way binding
+(function() {
+  var chips = document.querySelectorAll('#preset-chips .preset-chip');
+  var input = document.getElementById('duration');
+  chips.forEach(function(chip) {
+    chip.addEventListener('click', function() {
+      input.value = chip.getAttribute('data-minutes');
+      syncActiveChip();
+    });
+  });
+  input.addEventListener('input', syncActiveChip);
+})();
+function syncActiveChip() {
+  var v = document.getElementById('duration').value;
+  document.querySelectorAll('#preset-chips .preset-chip').forEach(function(c) {
+    c.classList.toggle('active', c.getAttribute('data-minutes') === v);
+  });
+}
+
+// Auto-identify current SREAgent user via their localStorage JWT and
+// opportunistically send the same token along with the form POST so the
+// backend can skip the name->user lookup. Falls back silently to manual
+// entry if no token is present or it's expired.
+(function() {
+  var token = null;
+  try { token = localStorage.getItem('token'); } catch (e) { /* private mode */ }
+  if (!token) return;
+  fetch('/api/v1/auth/profile', {
+    headers: { 'Authorization': 'Bearer ' + token }
+  }).then(function(r) {
+    if (!r.ok) throw new Error('unauthorized');
+    return r.json();
+  }).then(function(resp) {
+    var u = resp && resp.data ? resp.data : null;
+    if (!u) return;
+    var name = u.display_name || u.username || '';
+    if (!name) return;
+    var opInput = document.getElementById('operator_name');
+    opInput.value = name;
+    opInput.readOnly = true;
+    document.getElementById('identity-hint').classList.add('visible');
+    // Intercept form submit to attach Authorization header so the server
+    // can trust the user identity rather than rely on name matching.
+    var form = document.getElementById('action-form');
+    form.addEventListener('submit', function(ev) {
+      ev.preventDefault();
+      var btn = document.getElementById('submit-btn');
+      btn.disabled = true; btn.textContent = '提交中...';
+      var fd = new FormData(form);
+      fetch(form.action, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token },
+        body: fd
+      }).then(function(r) { return r.text().then(function(t) { return {ok: r.ok, html: t}; }); })
+        .then(function(res) { document.open(); document.write(res.html); document.close(); })
+        .catch(function() { btn.disabled = false; btn.textContent = '提交'; alert('提交失败，请重试'); });
+    }, true);
+  }).catch(function() { /* ignore, fall back to manual */ });
+})();
+
 %s
 document.getElementById('action-form').addEventListener('submit', function() {
   var btn = document.getElementById('submit-btn');

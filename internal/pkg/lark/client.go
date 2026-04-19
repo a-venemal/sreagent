@@ -383,11 +383,14 @@ func BuildEnrichedAlertCard(
 				URL:  actionBaseURL + "?action=acknowledge",
 				Type: "default",
 			})
-			// Silence 1 hour button
+			// Silence button — opens the action page with the silence
+			// dropdown pre-selected. The user picks the duration (preset
+			// chips 30m/2h/8h/1d/3d/7d/30d or custom) on the page, so we
+			// no longer hardcode 1 hour here.
 			actions = append(actions, CardButton{
 				Tag:  "button",
-				Text: CardText{Tag: "plain_text", Content: "🔕 静默1小时"},
-				URL:  actionBaseURL + "?action=silence&duration=60",
+				Text: CardText{Tag: "plain_text", Content: "🔕 静默告警"},
+				URL:  actionBaseURL + "?action=silence",
 				Type: "default",
 			})
 		} else if platformURL != "" {

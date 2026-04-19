@@ -3,13 +3,54 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
+	"github.com/sreagent/sreagent/internal/middleware"
 	"github.com/sreagent/sreagent/internal/repository"
 	"github.com/sreagent/sreagent/internal/service"
 )
+
+// maxSilenceMinutes caps user-supplied silence duration at 30 days.
+const maxSilenceMinutes = 30 * 24 * 60 // 43200
+
+// resolveOperator figures out which user id to attribute an action to.
+// Priority:
+//  1. A valid SREAgent JWT in the Authorization header (auto-identified
+//     from the browser's localStorage by the action page JS).
+//  2. A name typed into the form — matched against users.username.
+//  3. Anonymous (userID=0), operator name recorded in the note only.
+//
+// Returns (userID, displayName). displayName is the name we should stamp
+// into the timeline/comment, falling back to the form input.
+func (h *AlertActionHandler) resolveOperator(c *gin.Context, formName string) (uint, string) {
+	authz := c.GetHeader("Authorization")
+	if strings.HasPrefix(authz, "Bearer ") {
+		claims, err := middleware.ParseToken(strings.TrimPrefix(authz, "Bearer "), h.jwtSecret)
+		if err == nil && claims != nil && claims.UserID > 0 {
+			name := claims.Username
+			// Prefer the display_name from DB when available — username is
+			// often a login handle, not a human-readable name.
+			if u, uerr := h.userRepo.GetByID(c.Request.Context(), claims.UserID); uerr == nil && u != nil {
+				if u.DisplayName != "" {
+					name = u.DisplayName
+				}
+			}
+			if name == "" {
+				name = formName
+			}
+			return claims.UserID, name
+		}
+	}
+	if formName != "" {
+		if u, err := h.userRepo.GetByUsername(c.Request.Context(), formName); err == nil && u != nil {
+			return u.ID, formName
+		}
+	}
+	return 0, formName
+}
 
 // AlertActionHandler handles no-auth alert action pages (linked from Lark cards).
 type AlertActionHandler struct {
@@ -91,22 +132,19 @@ func (h *AlertActionHandler) ExecuteAction(c *gin.Context) {
 		return
 	}
 
-	// Look up or create a pseudo user ID from operator name
-	// For no-auth actions, we use a system user ID (0) and record the operator name in the note
-	var userID uint
-	if operatorName != "" {
-		// Try to find user by display name
-		user, findErr := h.userRepo.GetByUsername(c.Request.Context(), operatorName)
-		if findErr == nil {
-			userID = user.ID
-		}
+	// Resolve the acting user — prefer an Authorization bearer token
+	// (auto-attached by the page's JS when the browser has an SREAgent
+	// session), then fall back to a typed-in name, then anonymous.
+	userID, operatorDisplay := h.resolveOperator(c, operatorName)
+	if operatorDisplay == "" {
+		operatorDisplay = operatorName
 	}
 
 	actionNote := note
-	if operatorName != "" && actionNote == "" {
-		actionNote = "操作人: " + operatorName
-	} else if operatorName != "" {
-		actionNote = "操作人: " + operatorName + " | " + note
+	if operatorDisplay != "" && actionNote == "" {
+		actionNote = "操作人: " + operatorDisplay
+	} else if operatorDisplay != "" {
+		actionNote = "操作人: " + operatorDisplay + " | " + note
 	}
 
 	var actionErr error
@@ -127,6 +165,11 @@ func (h *AlertActionHandler) ExecuteAction(c *gin.Context) {
 			if d, parseErr := strconv.Atoi(durationStr); parseErr == nil && d > 0 {
 				duration = d
 			}
+		}
+		// Sanity cap: 30 days. Guards against typos and oversized values
+		// that would effectively disable alerting indefinitely.
+		if duration > maxSilenceMinutes {
+			duration = maxSilenceMinutes
 		}
 		reason := actionNote
 		if reason == "" {
