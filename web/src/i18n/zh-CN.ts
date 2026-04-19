@@ -65,6 +65,8 @@ export default {
     theme: '主题',
     darkMode: '深色模式',
     lightMode: '浅色模式',
+    collapseSidebar: '收起侧边栏',
+    expandSidebar: '展开侧边栏',
     profile: '个人信息',
     changePassword: '修改密码',
     logout: '退出登录',

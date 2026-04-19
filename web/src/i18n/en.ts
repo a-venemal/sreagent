@@ -65,6 +65,8 @@ export default {
     theme: 'Theme',
     darkMode: 'Dark Mode',
     lightMode: 'Light Mode',
+    collapseSidebar: 'Collapse sidebar',
+    expandSidebar: 'Expand sidebar',
     profile: 'Profile',
     changePassword: 'Change Password',
     logout: 'Logout',

@@ -25,8 +25,8 @@ import {
   LockClosedOutline,
   EarthOutline,
   TimeOutline,
-  PinOutline,
-  MenuOutline,
+  ChevronBackOutline,
+  ChevronForwardOutline,
 } from '@vicons/ionicons5'
 
 const router = useRouter()
@@ -35,31 +35,16 @@ const authStore = useAuthStore()
 const { t, locale } = useI18n()
 const message = useMessage()
 
-// Icon Rail state
-// pinned=true  → user locked the sidebar open; hover has no effect
-// pinned=false → icon-rail mode; hover temporarily expands
-const collapsed = ref(JSON.parse(localStorage.getItem('sre-sider-collapsed') ?? 'true'))
-const pinned    = ref(JSON.parse(localStorage.getItem('sre-sider-pinned')    ?? 'false'))
-
+// Sidebar collapse state: always-visible, user-controlled.
+// Defaults to expanded; the «/» chevron button toggles into icon-rail
+// (64px) mode. We removed the pin/hover-to-expand dance — users found
+// it jumpy, and "expanded by default + one-click collapse" is the
+// pattern nearly every SaaS app uses.
+const collapsed = ref(JSON.parse(localStorage.getItem('sre-sider-collapsed') ?? 'false'))
 watch(collapsed, v => localStorage.setItem('sre-sider-collapsed', JSON.stringify(v)))
-watch(pinned,    v => localStorage.setItem('sre-sider-pinned',    JSON.stringify(v)))
 
-// Click the pin button: toggle between pinned-open and icon-rail
-function togglePin() {
-  pinned.value = !pinned.value
-  collapsed.value = !pinned.value   // pinned → expanded; unpinned → collapsed
-}
-
-// Hover-to-expand (only in icon-rail / unpinned mode)
-let hoverExpandTimer = 0
-function onSiderEnter() {
-  if (pinned.value || !collapsed.value) return
-  hoverExpandTimer = window.setTimeout(() => { collapsed.value = false }, 200)
-}
-function onSiderLeave() {
-  clearTimeout(hoverExpandTimer)
-  if (pinned.value || collapsed.value) return
-  collapsed.value = true
+function toggleCollapsed() {
+  collapsed.value = !collapsed.value
 }
 
 const { open: openPalette } = useCommandPalette()
@@ -414,7 +399,7 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
 <template>
   <n-layout has-sider style="height: 100vh">
 
-    <!-- ===== Icon Rail Sidebar ===== -->
+    <!-- ===== Sidebar (always visible, user-togglable collapse) ===== -->
     <n-layout-sider
       class="sre-sider"
       bordered
@@ -423,8 +408,6 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
       :width="224"
       :collapsed="collapsed"
       :native-scrollbar="false"
-      @mouseenter="onSiderEnter"
-      @mouseleave="onSiderLeave"
     >
       <!-- Logo area -->
       <div class="sider-logo" :class="{ collapsed }">
@@ -434,15 +417,17 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
             <span class="gradient-text">SRE</span>Agent
           </span>
         </transition>
-        <!-- Pin/Unpin toggle button -->
-        <div
-          class="sider-pin-btn"
-          :class="{ pinned, collapsed }"
-          :title="pinned ? '取消固定侧边栏' : '固定侧边栏'"
-          @click.stop="togglePin"
-        >
-          <n-icon :component="pinned ? PinOutline : MenuOutline" :size="14" />
-        </div>
+      </div>
+
+      <!-- Collapse / Expand chevron — floats on the right edge of the sider,
+           always visible (no hover reveal) so users never have to hunt for it. -->
+      <div
+        class="sider-collapse-btn"
+        :class="{ collapsed }"
+        :title="collapsed ? t('header.expandSidebar') : t('header.collapseSidebar')"
+        @click="toggleCollapsed"
+      >
+        <n-icon :component="collapsed ? ChevronForwardOutline : ChevronBackOutline" :size="14" />
       </div>
 
       <!-- Navigation menu -->
@@ -799,26 +784,36 @@ async function toggleNotifyConfig(cfg: UserNotifyConfig, enabled: boolean) {
   padding: 14px 12px;
 }
 
-/* Pin / menu toggle button */
-.sider-pin-btn {
-  margin-left: auto;
+/* Collapse / expand chevron — floats on the outer edge of the sider,
+   straddling the border so it reads as an attached "tab". Always visible,
+   no hover-reveal, consistent with VSCode / Linear / Notion patterns. */
+.sider-collapse-btn {
+  position: absolute;
+  top: 72px;
+  right: -12px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--sre-radius-sm);
+  border-radius: 50%;
+  background: var(--sre-bg-card);
+  border: 1px solid var(--sre-border);
+  color: var(--sre-text-secondary);
   cursor: pointer;
-  color: var(--sre-text-tertiary);
-  flex-shrink: 0;
-  transition: background var(--sre-duration-fast), color var(--sre-duration-fast),
-              opacity var(--sre-duration-fast);
-  opacity: 0;
+  z-index: 20;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  transition: background var(--sre-duration-fast) var(--sre-ease-out),
+              border-color var(--sre-duration-fast) var(--sre-ease-out),
+              color var(--sre-duration-fast) var(--sre-ease-out),
+              transform var(--sre-duration-base) var(--sre-ease-out);
 }
-.sider-logo:hover .sider-pin-btn { opacity: 1; }
-.sider-pin-btn:hover { background: var(--sre-bg-elevated); color: var(--sre-primary); }
-.sider-pin-btn.pinned { color: var(--sre-primary); opacity: 1; }
-.sider-pin-btn.collapsed { display: none; }
+.sider-collapse-btn:hover {
+  background: var(--sre-primary-soft);
+  border-color: var(--sre-primary-ring);
+  color: var(--sre-primary);
+  transform: scale(1.08);
+}
 .logo-mark {
   width: 32px;
   height: 32px;
