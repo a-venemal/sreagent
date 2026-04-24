@@ -288,8 +288,17 @@ func main() {
 	// Initialize and start the heartbeat checker
 	heartbeatChecker := engine.NewHeartbeatChecker(ruleRepo, eventRepo, timelineRepo, zapLogger)
 
+	// Initialize alert group manager (group_wait / group_interval)
+	alertGroupMgr := service.NewAlertGroupManager(
+		func(ctx context.Context, event *model.AlertEvent) error {
+			return notifySvc.RouteAlert(ctx, event)
+		},
+		ruleRepo,
+		zapLogger,
+	)
+
 	// Shared onAlert callback used by both the evaluator and heartbeat checker.
-	// Pipeline: inhibition → mute → notify.
+	// Pipeline: inhibition → mute → bizgroup → group → notify.
 	onAlertFn := func(ctx context.Context, event *model.AlertEvent) {
 		// 1. Check inhibition rules (suppress target alerts when source is firing).
 		firingEvents, _, _ := eventSvc.List(ctx, "firing", "", 1, 2000)
@@ -330,8 +339,8 @@ func main() {
 			_ = eventRepo.UpdateLabels(ctx, event.ID, event.Labels)
 		}
 
-		// 4. Route notification.
-		if err := notifySvc.RouteAlert(ctx, event); err != nil {
+		// 4. Route notification (through group manager for group_wait/group_interval).
+		if err := alertGroupMgr.ProcessEvent(ctx, event); err != nil {
 			zapLogger.Error("failed to route alert notification",
 				zap.Uint("event_id", event.ID),
 				zap.Error(err),
@@ -449,6 +458,9 @@ func main() {
 	<-quit
 
 	zapLogger.Info("shutting down server...")
+
+	// Stop the alert group manager (flush remaining buffered alerts)
+	alertGroupMgr.Stop()
 
 	// Stop the escalation executor
 	escalationExecutor.Stop()

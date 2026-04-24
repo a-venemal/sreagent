@@ -37,6 +37,7 @@ export default {
     noPreview: 'No preview available',
     retry: 'Retry',
     savedSuccess: 'Saved successfully',
+    seconds: 'sec',
   },
   menu: {
     dashboard: 'Dashboard',
@@ -180,6 +181,10 @@ export default {
     warning: 'Warning',
     info: 'Info',
     groupName: 'Group',
+    groupWait: 'Group Wait',
+    groupWaitPlaceholder: 'Wait before first notification, 0=disabled',
+    groupInterval: 'Group Interval',
+    groupIntervalPlaceholder: 'Min interval between group notifications, 0=disabled',
     displayName: 'Display Name',
     annotations: 'Annotations',
     labels: 'Labels',

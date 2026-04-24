@@ -37,6 +37,7 @@ export default {
     noPreview: '暂无预览',
     retry: '重试',
     savedSuccess: '保存成功',
+    seconds: '秒',
   },
   menu: {
     dashboard: '仪表盘',
@@ -181,6 +182,10 @@ export default {
     warning: '警告',
     info: '信息',
     groupName: '分组',
+    groupWait: '分组等待',
+    groupWaitPlaceholder: '首次通知等待时间，0=禁用',
+    groupInterval: '分组间隔',
+    groupIntervalPlaceholder: '同组后续通知最小间隔，0=禁用',
     displayName: '显示名称',
     annotations: '注解',
     labels: '标签',

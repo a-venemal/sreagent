@@ -62,6 +62,8 @@ const defaultForm = {
   annotations: [] as { key: string; value: string }[],
   group_name: '',
   category: '',
+  group_wait_seconds: 0,
+  group_interval_seconds: 0,
 }
 
 const form = reactive({ ...defaultForm })
@@ -247,6 +249,8 @@ function openCreate() {
     annotations: [],
     group_name: '',
     category: '',
+    group_wait_seconds: 0,
+    group_interval_seconds: 0,
   })
   queryResult.value = null
   showModal.value = true
@@ -268,10 +272,13 @@ function openEdit(rule: AlertRule) {
     annotations: Object.entries(rule.annotations || {}).map(([key, value]) => ({ key, value })),
     group_name: rule.group_name,
     category: rule.category || '',
+    group_wait_seconds: rule.group_wait_seconds || 0,
+    group_interval_seconds: rule.group_interval_seconds || 0,
   })
   queryResult.value = null
   showModal.value = true
 }
+
 
 async function handleSave() {
   if (!form.name.trim()) {
@@ -302,6 +309,8 @@ async function handleSave() {
       annotations: kvArrayToRecord(form.annotations),
       group_name: form.group_name,
       category: form.category,
+      group_wait_seconds: form.group_wait_seconds,
+      group_interval_seconds: form.group_interval_seconds,
     }
 
     if (editingId.value) {
@@ -507,6 +516,23 @@ onMounted(() => {
           <n-gi>
             <n-form-item :label="t('alert.groupName')">
               <n-input v-model:value="form.group_name" placeholder="e.g. infrastructure" />
+            </n-form-item>
+          </n-gi>
+        </n-grid>
+
+        <n-grid :x-gap="12" :cols="2">
+          <n-gi>
+            <n-form-item :label="t('alert.groupWait')">
+              <n-input-number v-model:value="form.group_wait_seconds" :min="0" :max="3600" :placeholder="t('alert.groupWaitPlaceholder')" style="width: 100%">
+                <template #suffix>{{ t('common.seconds', '秒') }}</template>
+              </n-input-number>
+            </n-form-item>
+          </n-gi>
+          <n-gi>
+            <n-form-item :label="t('alert.groupInterval')">
+              <n-input-number v-model:value="form.group_interval_seconds" :min="0" :max="86400" :placeholder="t('alert.groupIntervalPlaceholder')" style="width: 100%">
+                <template #suffix>{{ t('common.seconds', '秒') }}</template>
+              </n-input-number>
             </n-form-item>
           </n-gi>
         </n-grid>

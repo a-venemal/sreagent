@@ -92,6 +92,9 @@ export interface AlertRule {
   heartbeat_last_at: string | null
   // SLA auto-escalation (0 = disabled)
   ack_sla_minutes: number
+  // Group notification timing (0 = disabled)
+  group_wait_seconds: number
+  group_interval_seconds: number
 }
 
 // ===== Alert Event =====

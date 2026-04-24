@@ -84,6 +84,8 @@ func (s *AlertRuleService) Update(ctx context.Context, rule *model.AlertRule) er
 	existing.Annotations = rule.Annotations
 	existing.GroupName = rule.GroupName
 	existing.Category = rule.Category
+	existing.GroupWaitSeconds = rule.GroupWaitSeconds
+	existing.GroupIntervalSeconds = rule.GroupIntervalSeconds
 	existing.UpdatedBy = rule.UpdatedBy
 	existing.EvalInterval = rule.EvalInterval
 	existing.RecoveryHold = rule.RecoveryHold

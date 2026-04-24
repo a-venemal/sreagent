@@ -58,6 +58,11 @@ type AlertRule struct {
 	EvalInterval int `json:"eval_interval" gorm:"default:60"`
 	// Recovery hold duration (留观时长) - e.g., "5m"
 	RecoveryHold string `json:"recovery_hold" gorm:"size:32;default:0s"`
+	// Group notification timing (Alertmanager-style)
+	// GroupWaitSeconds: how long to buffer the first alert in a group before sending (0 = disabled)
+	GroupWaitSeconds int `json:"group_wait_seconds" gorm:"not null;default:0"`
+	// GroupIntervalSeconds: minimum interval between notifications for an ongoing group (0 = disabled)
+	GroupIntervalSeconds int `json:"group_interval_seconds" gorm:"not null;default:0"`
 	// NoData detection
 	NoDataEnabled  bool   `json:"nodata_enabled" gorm:"default:false"`
 	NoDataDuration string `json:"nodata_duration" gorm:"size:32;default:5m"` // after this duration of no data, fire nodata alert
