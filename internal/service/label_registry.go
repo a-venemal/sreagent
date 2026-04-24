@@ -39,6 +39,9 @@ func (s *LabelRegistryService) SyncDatasource(ctx context.Context, ds *model.Dat
 	entries := make([]*model.LabelRegistry, 0, len(labels)*10)
 	for key, values := range labels {
 		for _, val := range values {
+			if len(val) > 2048 {
+				val = val[:2048]
+			}
 			entries = append(entries, &model.LabelRegistry{
 				DatasourceID: ds.ID,
 				LabelKey:     key,
@@ -61,6 +64,9 @@ func (s *LabelRegistryService) RecordFromLabels(datasourceID uint, labels map[st
 	for k, v := range labels {
 		if k == "" || v == "" {
 			continue
+		}
+		if len(v) > 2048 {
+			v = v[:2048]
 		}
 		entries = append(entries, &model.LabelRegistry{
 			DatasourceID: datasourceID,
