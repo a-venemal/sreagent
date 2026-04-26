@@ -4,6 +4,28 @@
 
 ---
 
+## [v1.10.0] - 2026-04-26
+
+### Added
+- 测试框架：internal/testutil/ (TestDB, SeedUser, SeedAlertRule, CleanupDB)
+- 测试骨架：service/alert_channel_test.go, handler/alert_channel_test.go
+- docs/testing.md 测试策略和覆盖目标
+- docs/prompts.md AI 提示词模板（新功能/Bug/审查/测试等）
+- CLAUDE.md 对话规范（token 节省规则）
+- config.example.yaml OIDC 配置段
+- GET /schedules/:id/participants 后端 handler + 路由
+- GET /schedules/:id/overrides 后端 handler + 路由
+- POST /alert-channels/:id/test 后端 handler + 路由
+
+### Fixed
+- 修复 3 个前端 API 调用无后端路由的问题（schedule participants/overrides, alert-channel test）
+
+### Removed
+- 4 个孤立 Vue 组件（SpotlightCursor, SeverityTag, StatusTag, SkeletonCard）
+- 废弃 TS 类型（NotifyChannel, NotifyPolicy v1）
+- 无关文档（3th_monitor_readme.md）
+- scripts/test-api.sh 中的 v1 通知端点
+
 ## [v1.9.10] - 2026-04-26
 
 ### Fixed
