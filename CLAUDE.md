@@ -63,19 +63,21 @@ NotifyRule / MuteRule / InhibitionRule / SubscribeRule ── match labels → N
 ### 第 1 步：定位模块
 根据用户描述的关键词，在 MODULES.md 中找到对应模块。
 
-**关键词 → 模块映射**：
-- 告警、规则、事件、firing、resolve、分组 → 告警引擎 + 告警规则 + 告警事件
-- 通知、飞书、邮件、webhook、lark → 通知管道 + 飞书集成 + 告警通道
-- 值班、排班、oncall、替班、升级 → 值班排班 + 升级策略
-- 静默、mute、抑制、inhibition → 静默规则 + 抑制规则
-- 数据源、Prometheus、PromQL、VM → 数据源 + 标签注册表
-- 登录、SSO、OIDC、权限、RBAC → 认证 + 用户管理 + 团队
-- 仪表盘、统计、MTTA、MTTR → 仪表盘
-- AI、分析、根因、SOP → AI 助手
-- 审计、操作日志 → 审计日志
-- 设置、配置、加密 → 系统设置
-- 标签、label → 标签注册表
-- 分组、biz-group → 业务分组
+**关键词 → 模块映射**（命中任一关键词即定位）：
+- 告警、规则、事件、firing、resolve、分组、触发、恢复、严重等级、severity、threshold、条件、评估、去重、指纹、心跳、heartbeat、状态机、group_wait、group_interval → 告警引擎 + 告警规则 + 告警事件
+- 通知、飞书、邮件、webhook、lark、短信、渠道、分发、模板、订阅、推送、card、卡片、消息、dispatch、notify → 通知管道 + 飞书集成 + 告警通道
+- 值班、排班、oncall、替班、升级、轮转、rotation、shift、日程、schedule、escalation、值班人 → 值班排班 + 升级策略
+- 静默、mute、屏蔽、抑制、inhibition、silence、免打扰 → 静默规则 + 抑制规则
+- 数据源、Prometheus、PromQL、VM、VictoriaMetrics、VLogs、Zabbix、采集、查询、metric、指标 → 数据源 + 标签注册表
+- 登录、SSO、OIDC、权限、RBAC、JWT、token、认证、授权、密码、session、Keycloak、角色 → 认证 + 用户管理 + 团队
+- 仪表盘、统计、MTTA、MTTR、趋势、top、概览、分析图、dashboard → 仪表盘
+- AI、LLM、大模型、分析、根因、SOP、智能、assistant → AI 助手
+- 审计、操作日志、audit、变更记录、操作记录 → 审计日志
+- 设置、配置、加密、AES、系统、SMTP、全局配置、健康检查 → 系统设置
+- 标签、label、tag、自动补全、注册表 → 标签注册表
+- 分组、biz-group、业务、树形、scope、作用域 → 业务分组
+- 用户、成员、团队、team、member、头像、个人信息、虚拟用户 → 用户管理 + 团队
+- 上传、头像、个人设置、偏好 → 用户管理
 
 ### 第 2 步：读取上下文（自动，不需要用户指定）
 1. 读 MODULES.md 中该模块条目（状态、依赖、文件列表）
