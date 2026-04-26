@@ -1,7 +1,59 @@
 # 模块清单 (MODULES)
 
-> 最后更新: 2026-04-26 | tag: v1.9.10
+> 最后更新: 2026-04-26 | tag: v1.10.0
 > 共 22 个 model, 30 个 handler, 29 个 service, 21 个 repository, 120+ API 端点
+
+---
+
+## 模块依赖关系
+
+```
+webhook ──────────→ alert-engine ←──── alert-rule (读取规则)
+                       │    ↑
+                       │    └── datasource (查询数据)
+                       │    └── label-registry (标签匹配)
+                       │
+                       ├──→ notification ←── notify-rule, notify-media, message-template, subscribe-rule
+                       │        └──→ lark, alert-channel (分发渠道)
+                       │
+                       └──→ escalation ──→ schedule (查找值班人)
+                                └──→ user, team (查找通知目标)
+
+schedule ──→ user (成员)
+auth ──→ user (用户信息)
+ai ──→ alert-engine (读取告警上下文)
+dashboard ──→ alert-event (统计数据)
+```
+
+改模块前查上方依赖：改 notification 会影响 alert-engine 和 escalation；改 schedule 会影响 escalation。
+
+## 测试覆盖状态
+
+| 模块 | 功能状态 | 单元测试 | 集成测试 | 覆盖率 |
+|------|----------|----------|----------|--------|
+| 告警引擎 | ✅ | ❌ | ❌ | 0% |
+| 告警规则 | ✅ | ❌ | ❌ | 0% |
+| 告警事件 | ✅ | ❌ | ❌ | 0% |
+| 告警通道 | ✅ | ⚠️ 骨架 | ❌ | 0% |
+| 通知管道 | ✅ | ❌ | ❌ | 0% |
+| 静默规则 | ✅ | ❌ | ❌ | 0% |
+| 抑制规则 | ✅ | ❌ | ❌ | 0% |
+| 标签注册表 | ✅ | ❌ | ❌ | 0% |
+| 数据源 | ✅ | ❌ | ❌ | 0% |
+| 值班排班 | ✅ | ❌ | ❌ | 0% |
+| 升级策略 | ✅ | ❌ | ❌ | 0% |
+| 认证 | ✅ | ❌ | ❌ | 0% |
+| 用户管理 | ✅ | ❌ | ❌ | 0% |
+| 团队 | ✅ | ❌ | ❌ | 0% |
+| 业务分组 | ✅ | ❌ | ❌ | 0% |
+| 仪表盘 | ✅ | ❌ | ❌ | 0% |
+| AI 助手 | ✅ | ❌ | ❌ | 0% |
+| 飞书集成 | ✅ | ❌ | ❌ | 0% |
+| 系统设置 | ✅ | ❌ | ❌ | 0% |
+| 审计日志 | ✅ | ❌ | ❌ | 0% |
+| Webhook 入站 | ✅ | ❌ | ❌ | 0% |
+
+> 目标：service 层 > 60%，handler 层 > 40%（v1.11.0 起逐步补全）
 
 ---
 
@@ -181,3 +233,4 @@
 | [docs/architecture.md](docs/architecture.md) | 架构设计 + ADR + 引擎状态机 + 通知管道 |
 | [docs/api.md](docs/api.md) | REST API 参考（120+ 端点） |
 | [docs/ci-deploy.md](docs/ci-deploy.md) | CI/CD 部署文档 |
+| [docs/phases.md](docs/phases.md) | Phase 追踪 + QA 修复汇总 |

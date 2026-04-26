@@ -49,10 +49,63 @@ EscalationPolicy ─1:N─ EscalationStep
 NotifyRule / MuteRule / InhibitionRule / SubscribeRule ── match labels → NotifyMedia
 ```
 
+## 测试约定
+
+- 框架：Go 标准 `testing` + `testify`
+- 工具：`internal/testutil/`（TestDB, SeedUser, SeedAlertRule, CleanupDB）
+- 文件：与被测文件同目录，后缀 `_test.go`
+- 命名：`Test_{函数名}_{场景}_{预期结果}`
+- 新功能必须有测试，Bug 修复必须有回归测试
+- 覆盖率目标：service 层 > 60%，handler 层 > 40%
+
+## 自动路由规则（收到需求后自动执行，不需要用户指定）
+
+### 第 1 步：定位模块
+根据用户描述的关键词，在 MODULES.md 中找到对应模块。
+
+**关键词 → 模块映射**：
+- 告警、规则、事件、firing、resolve、分组 → 告警引擎 + 告警规则 + 告警事件
+- 通知、飞书、邮件、webhook、lark → 通知管道 + 飞书集成 + 告警通道
+- 值班、排班、oncall、替班、升级 → 值班排班 + 升级策略
+- 静默、mute、抑制、inhibition → 静默规则 + 抑制规则
+- 数据源、Prometheus、PromQL、VM → 数据源 + 标签注册表
+- 登录、SSO、OIDC、权限、RBAC → 认证 + 用户管理 + 团队
+- 仪表盘、统计、MTTA、MTTR → 仪表盘
+- AI、分析、根因、SOP → AI 助手
+- 审计、操作日志 → 审计日志
+- 设置、配置、加密 → 系统设置
+- 标签、label → 标签注册表
+- 分组、biz-group → 业务分组
+
+### 第 2 步：读取上下文（自动，不需要用户指定）
+1. 读 MODULES.md 中该模块条目（状态、依赖、文件列表）
+2. 读 `docs/{module}.md`（如果存在）
+3. 读该模块的代码文件（从 MODULES.md 文件列表获取路径）
+4. 读相关测试文件（`_test.go`）
+
+### 第 3 步：检查依赖
+从 MODULES.md 依赖图确认修改是否影响其他模块。有影响则先告知用户影响范围。
+
+### 第 4 步：检查测试
+- 有测试 → 读取现有测试了解覆盖范围
+- 无测试 → 告知用户，建议实现后补测试
+
+### 第 5 步：给方案
+基于以上信息给出实现方案（修改哪些文件、新增哪些代码）。用户确认后再动手。
+
+## 变更追踪规则（每次修改后自动执行，不需要用户提醒）
+
+1. 修改了模块功能 → 更新 MODULES.md 中对应模块的状态或描述
+2. 新增 API 端点 → 更新 docs/api.md
+3. 修改数据模型 → 更新 MODULES.md 数据模型关系
+4. 每次变更 → 在 CHANGELOG.md 顶部追加记录
+5. 新增模块 → 在 MODULES.md 添加完整条目 + 创建 docs/{module}.md
+6. 涉及多模块 → 更新 MODULES.md 依赖关系图
+
 ## 对话规范（自动生效）
 
 1. 用 `file:line` 引用代码，**不要粘贴大段内容**
 2. 先方案后代码，确认后再实现
 3. 每次只改一个模块
-4. 完成后 `go build` 通过 + 更新 CHANGELOG.md
+4. 完成后 `go build` 通过 + 自动执行变更追踪规则
 5. 超过 20 轮对话考虑开新会话
