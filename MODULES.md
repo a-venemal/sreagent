@@ -175,15 +175,9 @@
 
 | 文档 | 内容 |
 |------|------|
-| [CLAUDE.md](CLAUDE.md) | AI 导航文件（< 200 行） |
-| [MODULES.md](MODULES.md) | 本文件 |
+| [CLAUDE.md](CLAUDE.md) | AI 协作规范（代码约定、目录、错误码） |
+| [MODULES.md](MODULES.md) | 本文件：22 个模块清单 + 状态 |
 | [CHANGELOG.md](CHANGELOG.md) | 变更日志 |
-| [docs/architecture.md](docs/architecture.md) | 系统架构全景图 |
-| [docs/alert-engine.md](docs/alert-engine.md) | 告警引擎设计 |
-| [docs/notification.md](docs/notification.md) | 通知管道设计 |
+| [docs/architecture.md](docs/architecture.md) | 架构设计 + ADR + 引擎状态机 + 通知管道 |
 | [docs/api.md](docs/api.md) | REST API 参考（120+ 端点） |
 | [docs/ci-deploy.md](docs/ci-deploy.md) | CI/CD 部署文档 |
-| [docs/roadmap.md](docs/roadmap.md) | 产品路线图 |
-| [docs/product-design.md](docs/product-design.md) | 产品设计文档 |
-| [docs/testing.md](docs/testing.md) | 测试策略和规范 |
-| [docs/prompts.md](docs/prompts.md) | AI 提示词模板 |
