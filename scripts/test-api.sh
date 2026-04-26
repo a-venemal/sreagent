@@ -77,21 +77,21 @@ curl -s -X POST "$BASE/teams" \
   }' | python3 -m json.tool 2>/dev/null || cat
 
 echo ""
-echo "=== 9. Create Notification Channel ==="
-curl -s -X POST "$BASE/notify-channels" \
+echo "=== 9. Create Notify Media (v2) ==="
+curl -s -X POST "$BASE/notify-media" \
   -H "$AUTH" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Payment Alerts Lark Group",
     "type": "lark_webhook",
     "description": "Lark group for payment team alerts",
-    "labels": {"business_line": "payment"},
-    "config": "{\"webhook_url\": \"https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-id\"}"
+    "config": {"webhook_url": "https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-id"},
+    "is_enabled": true
   }' | python3 -m json.tool 2>/dev/null || cat
 
 echo ""
-echo "=== 10. Create Notification Policy ==="
-curl -s -X POST "$BASE/notify-policies" \
+echo "=== 10. Create Notify Rule (v2) ==="
+curl -s -X POST "$BASE/notify-rules" \
   -H "$AUTH" \
   -H "Content-Type: application/json" \
   -d '{
@@ -99,9 +99,8 @@ curl -s -X POST "$BASE/notify-policies" \
     "description": "Route payment critical alerts to Lark group",
     "match_labels": {"business_line": "payment"},
     "severities": "critical,warning",
-    "channel_id": 1,
-    "throttle_minutes": 5,
-    "priority": 10
+    "media_id": 1,
+    "is_enabled": true
   }' | python3 -m json.tool 2>/dev/null || cat
 
 echo ""

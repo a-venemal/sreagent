@@ -307,6 +307,23 @@ func (h *ScheduleHandler) SetParticipants(c *gin.Context) {
 	Success(c, participants)
 }
 
+// GetParticipants returns the participant list for a schedule.
+func (h *ScheduleHandler) GetParticipants(c *gin.Context) {
+	id, err := GetIDParam(c, "id")
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	participants, err := h.svc.ListParticipants(c.Request.Context(), id)
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	Success(c, participants)
+}
+
 // ---------------------------------------------------------------------------
 // Overrides
 // ---------------------------------------------------------------------------
@@ -339,6 +356,23 @@ func (h *ScheduleHandler) CreateOverride(c *gin.Context) {
 	}
 
 	Success(c, override)
+}
+
+// ListOverrides returns all overrides for a schedule.
+func (h *ScheduleHandler) ListOverrides(c *gin.Context) {
+	id, err := GetIDParam(c, "id")
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	overrides, err := h.svc.ListOverrides(c.Request.Context(), id)
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	Success(c, overrides)
 }
 
 // DeleteOverride deletes a schedule override.

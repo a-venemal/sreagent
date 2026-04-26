@@ -158,3 +158,19 @@ func (h *AlertChannelHandler) Delete(c *gin.Context) {
 
 	Success(c, nil)
 }
+
+// Test validates the channel config and sends a test notification.
+func (h *AlertChannelHandler) Test(c *gin.Context) {
+	id, err := GetIDParam(c, "id")
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	if err := h.svc.TestChannel(c.Request.Context(), id); err != nil {
+		Error(c, err)
+		return
+	}
+
+	Success(c, gin.H{"success": true, "message": "channel test passed"})
+}

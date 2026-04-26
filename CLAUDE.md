@@ -158,6 +158,20 @@ Bug: [现象]
 
 ---
 
+## 对话规范（节省 token）
+
+以下规则每次会话自动生效，无需重复：
+
+1. **只给必要上下文**：用文件路径 `file:line` 引用代码，不要粘贴大段内容
+2. **按需加载文档**：只读本次任务相关的 docs/ 文件，不要全部加载
+3. **先方案后代码**：复杂任务先给方案，确认后再实现
+4. **单模块修改**：每次只改一个模块，避免跨模块批量操作
+5. **复用模板**：参考 `docs/prompts.md` 中的提示词模板，不要每次重写
+6. **控制对话长度**：超过 20 轮用"上下文压缩"模板开新对话
+7. **完成即文档**：完成功能后更新 CHANGELOG.md，下次不用重新解释
+
+---
+
 ## 深度文档索引
 
 | 文档 | 何时加载 |
@@ -168,6 +182,8 @@ Bug: [现象]
 | [docs/alert-engine.md](docs/alert-engine.md) | 修改告警引擎相关代码 |
 | [docs/notification.md](docs/notification.md) | 修改通知管道相关代码 |
 | [docs/api.md](docs/api.md) | API 端点参考 |
+| [docs/testing.md](docs/testing.md) | 测试策略和规范 |
+| [docs/prompts.md](docs/prompts.md) | 提示词模板（新功能/Bug/审查） |
 | [docs/ci-deploy.md](docs/ci-deploy.md) | CI/CD 和部署 |
 | [docs/roadmap.md](docs/roadmap.md) | 竞品分析、功能路线图 |
 

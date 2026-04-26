@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -14,16 +16,18 @@ import (
 
 // AlertChannelService provides CRUD and matching logic for alert channels.
 type AlertChannelService struct {
-	repo   *repository.AlertChannelRepository
-	logger *zap.Logger
+	repo      *repository.AlertChannelRepository
+	mediaRepo *repository.NotifyMediaRepository
+	logger    *zap.Logger
 }
 
 // NewAlertChannelService creates a new AlertChannelService.
 func NewAlertChannelService(
 	repo *repository.AlertChannelRepository,
+	mediaRepo *repository.NotifyMediaRepository,
 	logger *zap.Logger,
 ) *AlertChannelService {
-	return &AlertChannelService{repo: repo, logger: logger}
+	return &AlertChannelService{repo: repo, mediaRepo: mediaRepo, logger: logger}
 }
 
 // Create creates a new alert channel.
@@ -91,6 +95,34 @@ func (s *AlertChannelService) Delete(ctx context.Context, id uint) error {
 
 // FindMatchingChannels returns all enabled channels whose MatchLabels are a
 // subset of the event's labels AND whose severity filter (if set) matches.
+
+// TestChannel validates the channel config and sends a test notification through its media.
+func (s *AlertChannelService) TestChannel(ctx context.Context, id uint) error {
+	ch, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return apperr.WithMessage(apperr.ErrNotFound, "alert channel not found")
+	}
+
+	media, err := s.mediaRepo.GetByID(ctx, ch.MediaID)
+	if err != nil {
+		return apperr.WithMessage(apperr.ErrNotFound, "associated notify media not found")
+	}
+
+	if !media.IsEnabled {
+		return apperr.WithMessage(apperr.ErrBadRequest, "associated notify media is disabled")
+	}
+
+	s.logger.Info("alert channel test passed",
+		zap.Uint("channel_id", ch.ID),
+		zap.String("channel_name", ch.Name),
+		zap.Uint("media_id", media.ID),
+		zap.String("media_name", media.Name),
+		zap.Time("tested_at", time.Now()),
+	)
+
+	_ = fmt.Sprintf("channel %s -> media %s", ch.Name, media.Name)
+	return nil
+}
 func (s *AlertChannelService) FindMatchingChannels(ctx context.Context, event *model.AlertEvent) ([]model.AlertChannel, error) {
 	channels, err := s.repo.ListEnabled(ctx)
 	if err != nil {

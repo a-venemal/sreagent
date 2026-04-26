@@ -263,6 +263,7 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 					alertChannels.POST("", manage, handlers.AlertChannel.Create)
 					alertChannels.PUT("/:id", manage, handlers.AlertChannel.Update)
 					alertChannels.DELETE("/:id", manage, handlers.AlertChannel.Delete)
+					alertChannels.POST("/:id/test", manage, handlers.AlertChannel.Test)
 				}
 			}
 
@@ -326,11 +327,13 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 				schedules.GET("", handlers.Schedule.ListSchedules)
 				schedules.GET("/:id", handlers.Schedule.GetSchedule)
 				schedules.GET("/:id/oncall", handlers.Schedule.GetCurrentOnCall)
+				schedules.GET("/:id/participants", handlers.Schedule.GetParticipants)
 				schedules.GET("/:id/shifts", handlers.Schedule.ListShifts)
 				schedules.POST("", manage, handlers.Schedule.CreateSchedule)
 				schedules.PUT("/:id", manage, handlers.Schedule.UpdateSchedule)
 				schedules.DELETE("/:id", manage, handlers.Schedule.DeleteSchedule)
 				schedules.PUT("/:id/participants", manage, handlers.Schedule.SetParticipants)
+				schedules.GET("/:id/overrides", handlers.Schedule.ListOverrides)
 				schedules.POST("/:id/overrides", manage, handlers.Schedule.CreateOverride)
 				schedules.DELETE("/:id/overrides/:oid", manage, handlers.Schedule.DeleteOverride)
 				schedules.POST("/:id/shifts", manage, handlers.Schedule.CreateShift)

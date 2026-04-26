@@ -245,35 +245,6 @@ export interface EscalationStep {
   notify_channel_id: number
 }
 
-// ===== Notification =====
-export type NotifyChannelType = 'lark_webhook' | 'lark_bot' | 'email' | 'sms' | 'custom_webhook'
-
-export interface NotifyChannel {
-  id: number
-  name: string
-  type: NotifyChannelType
-  description: string
-  labels: Record<string, string>
-  config: string
-  is_enabled: boolean
-  created_at: string
-}
-
-export interface NotifyPolicy {
-  id: number
-  name: string
-  description: string
-  match_labels: Record<string, string>
-  severities: string
-  channel_id: number
-  channel?: NotifyChannel
-  throttle_minutes: number
-  template_name: string
-  is_enabled: boolean
-  priority: number
-  created_at: string
-}
-
 // ===== Mute Rule =====
 export interface MuteRule {
   id: number

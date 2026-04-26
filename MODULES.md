@@ -185,3 +185,5 @@
 | [docs/ci-deploy.md](docs/ci-deploy.md) | CI/CD 部署文档 |
 | [docs/roadmap.md](docs/roadmap.md) | 产品路线图 |
 | [docs/product-design.md](docs/product-design.md) | 产品设计文档 |
+| [docs/testing.md](docs/testing.md) | 测试策略和规范 |
+| [docs/prompts.md](docs/prompts.md) | AI 提示词模板 |

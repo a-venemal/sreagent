@@ -1,5 +1,3 @@
 export { default as KVEditor } from './common/KVEditor.vue'
 export type { KVItem } from './common/KVEditor.vue'
 export { default as PageHeader } from './common/PageHeader.vue'
-export { default as SeverityTag } from './common/SeverityTag.vue'
-export { default as StatusTag } from './common/StatusTag.vue'

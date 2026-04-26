@@ -157,7 +157,7 @@ func main() {
 	auditLogSvc := service.NewAuditLogService(auditLogRepo, zapLogger)
 
 	// Dispatch services
-	alertChannelSvc := service.NewAlertChannelService(alertChannelRepo, zapLogger)
+	alertChannelSvc := service.NewAlertChannelService(alertChannelRepo, notifyMediaRepo, zapLogger)
 	userNotifyConfigSvc := service.NewUserNotifyConfigService(userNotifyConfigRepo, zapLogger)
 
 	// Seed default notification media and templates

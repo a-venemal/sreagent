@@ -51,7 +51,23 @@ engine:
   enabled: true
   sync_interval: 30     # how often to sync alert rules from DB (seconds)
 
+# OIDC SSO (optional — leave enabled: false to use local auth only)
+# oidc:
+#   enabled: false
+#   issuer_url: "https://keycloak.example.com/realms/sreagent"
+#   client_id: "sreagent"
+#   client_secret: ""              # override via SREAGENT_OIDC_CLIENT_SECRET
+#   redirect_url: "https://sreagent.example.com/auth/oidc/callback"
+#   scopes: ["openid", "profile", "email"]
+#   role_claim: "realm_roles"      # JWT claim path for role extraction
+#   role_mapping:                  # map IdP roles to SREAgent roles
+#     sreagent-admin: admin
+#     sreagent-lead: team_lead
+#     sreagent-member: member
+#   default_role: "viewer"         # role for unmapped users
+#   auto_provision: true           # auto-create user on first OIDC login
+
 # ============================================================
-# AI and Lark Bot settings are NOT stored here.
-# Configure them at runtime via: Settings → AI Config / Lark Bot
+# AI, Lark Bot, and SMTP settings are NOT stored here.
+# Configure them at runtime via: Web UI → Settings page
 # ============================================================
