@@ -144,3 +144,4 @@ NotifyRule / MuteRule / InhibitionRule / SubscribeRule ── match labels → N
 3. 每次只改一个模块
 4. 完成后 `go build` 通过 + 自动执行变更追踪规则
 5. 超过 20 轮对话考虑开新会话
+6. **禁止自动全量探索**：不要启动多个 agent 扫描整个项目，按需读取单个文件即可
