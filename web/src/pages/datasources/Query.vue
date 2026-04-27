@@ -12,6 +12,7 @@ const { t } = useI18n()
 const datasources = ref<DataSource[]>([])
 const selectedDsId = ref<number | null>(null)
 const expression = ref('')
+const queryTime = ref(0)
 const loading = ref(false)
 const queryResult = ref<QueryResponse | null>(null)
 const queryError = ref('')
@@ -33,6 +34,7 @@ async function handleQuery() {
   try {
     const { data } = await datasourceApi.query(selectedDsId.value, {
       expression: expression.value,
+      time: queryTime.value,
     })
     queryResult.value = data.data
   } catch (err: any) {
@@ -67,6 +69,7 @@ onMounted(fetchDatasources)
         <div>
           <label>{{ t('datasource.queryTime') }}</label>
           <n-select
+            v-model:value="queryTime"
             :options="[
               { label: 'now', value: 0 },
               { label: '5m ago', value: 300 },
