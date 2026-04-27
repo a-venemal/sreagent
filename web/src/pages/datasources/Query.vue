@@ -98,21 +98,25 @@ onMounted(fetchDatasources)
           </template>
         </n-empty>
 
-        <n-form v-else label-placement="top">
-          <n-form-item :label="t('datasource.selectDatasource')">
-            <n-select
-              v-model:value="selectedDsId"
-              :options="dsOptions"
-              :placeholder="t('datasource.selectDatasource')"
-              filterable
-            />
-          </n-form-item>
+        <n-space v-else vertical :size="16">
+          <n-grid :cols="2" :x-gap="12">
+            <n-gi>
+              <label class="field-label">{{ t('datasource.selectDatasource') }}</label>
+              <n-select
+                v-model:value="selectedDsId"
+                :options="dsOptions"
+                :placeholder="t('datasource.selectDatasource')"
+                filterable
+              />
+            </n-gi>
+            <n-gi>
+              <label class="field-label">{{ t('datasource.queryTime') }}</label>
+              <n-select v-model:value="queryTime" :options="timeOptions" />
+            </n-gi>
+          </n-grid>
 
-          <n-form-item :label="t('datasource.queryTime')">
-            <n-select v-model:value="queryTime" :options="timeOptions" />
-          </n-form-item>
-
-          <n-form-item :label="t('datasource.queryExpression')">
+          <div>
+            <label class="field-label">{{ t('datasource.queryExpression') }}</label>
             <n-input
               v-model:value="expression"
               type="textarea"
@@ -120,7 +124,7 @@ onMounted(fetchDatasources)
               :rows="4"
               @keyup.ctrl.enter="handleQuery"
             />
-          </n-form-item>
+          </div>
 
           <n-button
             type="primary"
@@ -130,7 +134,7 @@ onMounted(fetchDatasources)
           >
             {{ t('datasource.executeQuery') }}
           </n-button>
-        </n-form>
+        </n-space>
       </n-card>
     </n-spin>
 
@@ -177,4 +181,5 @@ onMounted(fetchDatasources)
 <style scoped>
 .query-page { max-width: 1400px; }
 .content-card { border-radius: 12px; }
+.field-label { display: block; margin-bottom: 4px; font-size: 13px; color: #666; }
 </style>
