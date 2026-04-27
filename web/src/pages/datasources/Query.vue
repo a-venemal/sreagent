@@ -4,7 +4,6 @@ import { useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { datasourceApi } from '@/api'
 import type { DataSource, QueryResponse } from '@/types'
-import { PlayOutline } from '@vicons/ionicons5'
 import PageHeader from '@/components/common/PageHeader.vue'
 
 const message = useMessage()
@@ -16,16 +15,6 @@ const expression = ref('')
 const loading = ref(false)
 const queryResult = ref<QueryResponse | null>(null)
 const queryError = ref('')
-
-const timeRangeOptions = [
-  { label: 'now', value: 0 },
-  { label: '5m ago', value: 300 },
-  { label: '15m ago', value: 900 },
-  { label: '1h ago', value: 3600 },
-  { label: '6h ago', value: 21600 },
-  { label: '24h ago', value: 86400 },
-]
-const timeOffset = ref(0)
 
 async function fetchDatasources() {
   try {
@@ -66,31 +55,43 @@ onMounted(fetchDatasources)
 
     <n-card :bordered="false" class="content-card">
       <n-space vertical :size="16">
-        <n-select
-          v-model:value="selectedDsId"
-          :options="datasources.map(ds => ({ label: `${ds.name} (${ds.type})`, value: ds.id }))"
-          :placeholder="t('datasource.selectDatasource')"
-          filterable
-        />
-        <n-select
-          v-model:value="timeOffset"
-          :options="timeRangeOptions"
-          :placeholder="t('datasource.queryTime')"
-        />
-        <n-input
-          v-model:value="expression"
-          type="textarea"
-          :placeholder="t('datasource.queryPlaceholder')"
-          :rows="3"
-          @keyup.ctrl.enter="handleQuery"
-        />
+        <div>
+          <label>{{ t('datasource.selectDatasource') }}</label>
+          <n-select
+            v-model:value="selectedDsId"
+            :options="datasources.map(ds => ({ label: `${ds.name} (${ds.type})`, value: ds.id }))"
+            :placeholder="t('datasource.selectDatasource')"
+            filterable
+          />
+        </div>
+        <div>
+          <label>{{ t('datasource.queryTime') }}</label>
+          <n-select
+            :options="[
+              { label: 'now', value: 0 },
+              { label: '5m ago', value: 300 },
+              { label: '15m ago', value: 900 },
+              { label: '1h ago', value: 3600 },
+            ]"
+            :placeholder="t('datasource.queryTime')"
+          />
+        </div>
+        <div>
+          <label>{{ t('datasource.queryExpression') }}</label>
+          <n-input
+            v-model:value="expression"
+            type="textarea"
+            :placeholder="t('datasource.queryPlaceholder')"
+            :rows="3"
+            @keyup.ctrl.enter="handleQuery"
+          />
+        </div>
         <n-button
           type="primary"
           :loading="loading"
           @click="handleQuery"
           :disabled="!selectedDsId || !expression.trim()"
         >
-          <template #icon><n-icon :component="PlayOutline" /></template>
           {{ t('datasource.executeQuery') }}
         </n-button>
       </n-space>
@@ -139,4 +140,5 @@ onMounted(fetchDatasources)
 <style scoped>
 .query-page { max-width: 1400px; }
 .content-card { border-radius: 12px; }
+.content-card label { display: block; margin-bottom: 4px; font-size: 13px; color: #666; }
 </style>
