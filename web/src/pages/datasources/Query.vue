@@ -37,8 +37,6 @@ const dsOptions = computed(() =>
   }))
 )
 
-const hasDatasources = computed(() => datasources.value.length > 0)
-
 async function fetchDatasources() {
   pageLoading.value = true
   try {
@@ -90,15 +88,7 @@ onMounted(fetchDatasources)
 
     <n-spin :show="pageLoading">
       <n-card :bordered="false" class="content-card">
-        <n-empty v-if="!pageLoading && !hasDatasources" :description="t('datasource.noEnabledDatasource')">
-          <template #extra>
-            <n-button type="primary" @click="$router.push('/datasources')">
-              {{ t('datasource.add') }}
-            </n-button>
-          </template>
-        </n-empty>
-
-        <div v-else class="query-form">
+        <div class="query-form">
           <div class="query-row">
             <div class="query-field">
               <label class="field-label">{{ t('datasource.selectDatasource') }}</label>
