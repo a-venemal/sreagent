@@ -98,9 +98,9 @@ onMounted(fetchDatasources)
           </template>
         </n-empty>
 
-        <n-space v-else vertical :size="16">
-          <n-grid :cols="2" :x-gap="12">
-            <n-gi>
+        <div v-else class="query-form">
+          <div class="query-row">
+            <div class="query-field">
               <label class="field-label">{{ t('datasource.selectDatasource') }}</label>
               <n-select
                 v-model:value="selectedDsId"
@@ -108,14 +108,14 @@ onMounted(fetchDatasources)
                 :placeholder="t('datasource.selectDatasource')"
                 filterable
               />
-            </n-gi>
-            <n-gi>
+            </div>
+            <div class="query-field">
               <label class="field-label">{{ t('datasource.queryTime') }}</label>
               <n-select v-model:value="queryTime" :options="timeOptions" />
-            </n-gi>
-          </n-grid>
+            </div>
+          </div>
 
-          <div>
+          <div class="query-field">
             <label class="field-label">{{ t('datasource.queryExpression') }}</label>
             <n-input
               v-model:value="expression"
@@ -134,7 +134,7 @@ onMounted(fetchDatasources)
           >
             {{ t('datasource.executeQuery') }}
           </n-button>
-        </n-space>
+        </div>
       </n-card>
     </n-spin>
 
@@ -181,5 +181,8 @@ onMounted(fetchDatasources)
 <style scoped>
 .query-page { max-width: 1400px; }
 .content-card { border-radius: 12px; }
+.query-form { display: flex; flex-direction: column; gap: 16px; }
+.query-row { display: flex; gap: 12px; }
+.query-field { flex: 1; }
 .field-label { display: block; margin-bottom: 4px; font-size: 13px; color: #666; }
 </style>
