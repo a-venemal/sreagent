@@ -180,6 +180,7 @@ export default {
     queryNoResult: '无查询结果',
     queryExecuted: '查询已执行',
     noEnabledDatasource: '暂无可用数据源，请先添加并启用数据源',
+    fetchFailed: '获取数据源列表失败',
     resultType: '结果类型',
     seriesCount: '序列数',
   },

@@ -21,7 +21,9 @@ async function fetchDatasources() {
   try {
     const { data } = await datasourceApi.list({ page: 1, page_size: 100 })
     datasources.value = (data.data.list || []).filter(ds => ds.is_enabled)
-  } catch { /* silent */ }
+  } catch (err: any) {
+    message.error(err.message || t('datasource.fetchFailed'))
+  }
 }
 
 async function handleQuery() {
@@ -62,7 +64,7 @@ onMounted(fetchDatasources)
           <n-select
             v-model:value="selectedDsId"
             :options="datasources.map(ds => ({ label: `${ds.name} (${ds.type})`, value: ds.id }))"
-            :placeholder="t('datasource.selectDatasource')"
+            :placeholder="datasources.length === 0 ? t('datasource.noEnabledDatasource') : t('datasource.selectDatasource')"
             filterable
           />
         </div>
