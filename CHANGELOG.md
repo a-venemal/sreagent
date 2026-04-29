@@ -4,6 +4,13 @@
 
 ---
 
+## [v1.16.1] - 2026-04-29
+
+### Changed
+- 统一数据探索页面（Explore）：合并 PromQL Explore 和 LogExplorer，根据数据源类型自动切换指标/日志模式
+- 侧栏新增顶级「探索」菜单，旧路由 `/datasources/query` 和 `/explore/logs` 自动重定向
+- 删除独立的 `LogExplorer.vue`
+
 ## [v1.16.0] - 2026-04-29
 
 ### Added
