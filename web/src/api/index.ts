@@ -668,3 +668,27 @@ export const dashboardV2Api = {
   delete: (id: number) =>
     request.delete<ApiResponse<null>>(`/dashboards/${id}`),
 }
+
+// --- Alert Rule Templates ---
+export const templateApi = {
+  list: (params?: { page?: number; page_size?: number; category?: string; search?: string }) =>
+    request.get<ApiResponse<PageData<any>>>('/alert-rule-templates', { params }),
+
+  get: (id: number) =>
+    request.get<ApiResponse<any>>(`/alert-rule-templates/${id}`),
+
+  create: (data: any) =>
+    request.post<ApiResponse<any>>('/alert-rule-templates', data),
+
+  update: (id: number, data: any) =>
+    request.put<ApiResponse<any>>(`/alert-rule-templates/${id}`, data),
+
+  delete: (id: number) =>
+    request.delete<ApiResponse<null>>(`/alert-rule-templates/${id}`),
+
+  listCategories: () =>
+    request.get<ApiResponse<string[]>>('/alert-rule-templates/categories'),
+
+  apply: (id: number, overrides: any) =>
+    request.post<ApiResponse<any>>(`/alert-rule-templates/${id}/apply`, overrides),
+}

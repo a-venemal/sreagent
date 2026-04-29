@@ -2,7 +2,7 @@
 import { h, ref, reactive, onMounted, computed, watch } from 'vue'
 import { useMessage, NTag, NButton, NSpace, NPopconfirm } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
-import { alertRuleApi, datasourceApi } from '@/api'
+import { alertRuleApi, datasourceApi, templateApi } from '@/api'
 import type { AlertRule, DataSource, AlertSeverity, DataSourceType, QueryResponse } from '@/types'
 import { formatTime, kvArrayToRecord } from '@/utils/format'
 import { getSeverityType, getRuleStatusType } from '@/utils/alert'
@@ -25,6 +25,75 @@ const categories = ref<string[]>([])
 // Expression test state
 const queryTesting = ref(false)
 const queryResult = ref<QueryResponse | null>(null)
+
+// Template state
+const showTemplatePicker = ref(false)
+const templateLoading = ref(false)
+const templates = ref<any[]>([])
+const templateCategories = ref<string[]>([])
+const templateSearch = ref('')
+const templateCategory = ref('')
+const appliedTemplateId = ref<number | null>(null)
+
+async function fetchTemplates() {
+  templateLoading.value = true
+  try {
+    const res = await templateApi.list({
+      category: templateCategory.value || undefined,
+      search: templateSearch.value || undefined,
+      page: 1,
+      page_size: 50,
+    })
+    templates.value = res.data.data.list || []
+    templateCategories.value = (await templateApi.listCategories()).data.data || []
+  } catch { /* ignore */ }
+  finally { templateLoading.value = false }
+}
+
+async function loadTemplate(tpl: any) {
+  appliedTemplateId.value = tpl.id
+  Object.assign(form, {
+    name: tpl.name || '',
+    display_name: '',
+    description: tpl.description || '',
+    datasource_type: tpl.datasource_type || '',
+    expression: tpl.expression || '',
+    for_duration: tpl.for_duration || '5m',
+    severity: tpl.severity || 'warning',
+    labels: tpl.labels ? Object.entries(tpl.labels).map(([k, v]: any) => ({ key: k, value: v })) : [],
+    annotations: tpl.annotations ? Object.entries(tpl.annotations).map(([k, v]: any) => ({ key: k, value: v })) : [],
+    group_name: tpl.group_name || '',
+    category: tpl.category || '',
+  })
+  showTemplatePicker.value = false
+  message.success(t('alert.templateLoaded') || 'Template loaded')
+}
+
+async function saveAsTemplate() {
+  const payload = {
+    name: form.name,
+    description: form.description,
+    datasource_type: form.datasource_type,
+    expression: form.expression,
+    for_duration: form.for_duration,
+    severity: form.severity,
+    labels: kvArrayToRecord(form.labels),
+    annotations: kvArrayToRecord(form.annotations),
+    group_name: form.group_name,
+    category: form.category,
+  }
+  try {
+    await templateApi.create(payload)
+    message.success(t('alert.templateSaved') || 'Template saved')
+  } catch (err: any) {
+    message.error(err.message || t('common.saveFailed'))
+  }
+}
+
+function openTemplatePicker() {
+  fetchTemplates()
+  showTemplatePicker.value = true
+}
 
 // Import/Export state
 const showImportExport = ref(false)
@@ -69,6 +138,11 @@ const defaultForm = {
 const form = reactive({ ...defaultForm })
 
 const severityOptions = [
+  { label: () => t('alert.p0'), value: 'p0' },
+  { label: () => t('alert.p1'), value: 'p1' },
+  { label: () => t('alert.p2'), value: 'p2' },
+  { label: () => t('alert.p3'), value: 'p3' },
+  { label: () => t('alert.p4'), value: 'p4' },
   { label: () => t('alert.critical'), value: 'critical' },
   { label: () => t('alert.warning'), value: 'warning' },
   { label: () => t('alert.info'), value: 'info' },
@@ -143,7 +217,7 @@ const columns = [
     key: 'severity',
     width: 100,
     render: (row: AlertRule) =>
-      h(NTag, { type: getSeverityType(row.severity), size: 'small', round: true }, { default: () => row.severity }),
+      h(NTag, { type: getSeverityType(row.severity), size: 'small', round: true }, { default: () => t(`alert.${row.severity}` as any) || row.severity }),
   },
   {
     title: () => t('alert.expression'),
@@ -475,6 +549,52 @@ onMounted(() => {
 
     <!-- Create/Edit Modal -->
     <n-modal v-model:show="showModal" preset="card" :title="modalTitle" style="width: 680px" :bordered="false">
+      <!-- Template bar (create mode only) -->
+      <div v-if="!editingId" style="margin-bottom: 16px; display: flex; gap: 8px; align-items: center">
+        <n-button size="small" secondary @click="openTemplatePicker">
+          {{ t('alert.loadFromTemplate', 'Load from template') }}
+        </n-button>
+        <span v-if="appliedTemplateId" style="font-size: 12px; color: var(--sre-text-tertiary)">
+          {{ t('alert.templateApplied', 'Template applied') }}
+        </span>
+      </div>
+
+      <!-- Template picker sub-modal -->
+      <n-modal v-model:show="showTemplatePicker" preset="card" :title="t('alert.selectTemplate', 'Select Template')" style="width: 600px">
+        <div style="display: flex; gap: 8px; margin-bottom: 12px">
+          <n-input v-model:value="templateSearch" :placeholder="t('common.search')" size="small" clearable style="flex: 1" @update:value="fetchTemplates" />
+          <n-select
+            v-model:value="templateCategory"
+            :options="templateCategories.map(c => ({ label: c, value: c }))"
+            :placeholder="t('alert.category')"
+            size="small"
+            clearable
+            style="width: 140px"
+            @update:value="fetchTemplates"
+          />
+        </div>
+        <n-data-table
+          :columns="[
+            { title: () => t('common.name'), key: 'name', ellipsis: { tooltip: true } },
+            { title: () => t('alert.category'), key: 'category', width: 100 },
+            { title: () => t('alert.severity'), key: 'severity', width: 80 },
+            {
+              title: () => '',
+              key: 'action',
+              width: 80,
+              render: (row: any) => h(NButton, { size: 'tiny', secondary: true, onClick: () => loadTemplate(row) }, { default: () => t('common.apply') }),
+            },
+          ]"
+          :data="templates"
+          :loading="templateLoading"
+          :bordered="false"
+          size="small"
+          :pagination="false"
+          :max-height="320"
+          :row-key="(row: any) => row.id"
+        />
+      </n-modal>
+
       <n-form label-placement="top">
         <n-grid :x-gap="12" :cols="2">
           <n-gi>
@@ -628,11 +748,16 @@ onMounted(() => {
       </n-form>
 
       <template #action>
-        <n-space justify="end">
-          <n-button @click="showModal = false">{{ t('common.cancel') }}</n-button>
-          <n-button type="primary" :loading="saving" @click="handleSave">
-            {{ editingId ? t('common.update') : t('common.create') }}
+        <n-space justify="space-between" style="width: 100%">
+          <n-button size="small" secondary @click="saveAsTemplate">
+            {{ t('alert.saveAsTemplate', 'Save as template') }}
           </n-button>
+          <n-space>
+            <n-button @click="showModal = false">{{ t('common.cancel') }}</n-button>
+            <n-button type="primary" :loading="saving" @click="handleSave">
+              {{ editingId ? t('common.update') : t('common.create') }}
+            </n-button>
+          </n-space>
         </n-space>
       </template>
     </n-modal>

@@ -7,9 +7,14 @@ import type { AlertSeverity, AlertEventStatus, AlertRuleStatus, DataSourceStatus
  */
 export function getSeverityType(severity: string): 'error' | 'warning' | 'info' | 'default' {
   switch (severity) {
+    case 'p0':
     case 'critical': return 'error'
+    case 'p1':
+    case 'p2':
     case 'warning':  return 'warning'
+    case 'p3':
     case 'info':     return 'info'
+    case 'p4':       return 'default'
     default:         return 'default'
   }
 }
@@ -19,9 +24,14 @@ export function getSeverityType(severity: string): 'error' | 'warning' | 'info' 
  */
 export function getSeverityColor(severity: string): string {
   switch (severity) {
-    case 'critical': return '#e88080'
-    case 'warning':  return '#f2c97d'
-    case 'info':     return '#70c0e8'
+    case 'p0':
+    case 'critical': return '#ef4444'
+    case 'p1':       return '#f97316'
+    case 'p2':
+    case 'warning':  return '#f59e0b'
+    case 'p3':
+    case 'info':     return '#3b82f6'
+    case 'p4':       return '#6b7280'
     default:         return '#999'
   }
 }
@@ -30,8 +40,9 @@ export function getSeverityColor(severity: string): string {
  * Return a CSS class name for table row highlighting by severity.
  */
 export function severityRowClass(row: { severity?: string }): string {
-  if (row.severity === 'critical') return 'row-critical'
-  if (row.severity === 'warning') return 'row-warning'
+  const s = row.severity
+  if (s === 'p0' || s === 'critical') return 'row-critical'
+  if (s === 'p1' || s === 'p2' || s === 'warning') return 'row-warning'
   return ''
 }
 
@@ -57,12 +68,12 @@ export function getEventStatusType(status: string): 'error' | 'warning' | 'info'
  */
 export function getStatusColor(status: string): string {
   switch (status) {
-    case 'firing':       return '#e88080'
-    case 'acknowledged': return '#f2c97d'
-    case 'assigned':     return '#70c0e8'
-    case 'resolved':     return '#18a058'
-    case 'closed':       return '#666'
-    case 'silenced':     return '#a855f7'
+    case 'firing':       return '#ef4444'
+    case 'acknowledged': return '#f59e0b'
+    case 'assigned':     return '#3b82f6'
+    case 'resolved':     return '#10b981'
+    case 'closed':       return '#666666'
+    case 'silenced':     return '#a78bfa'
     default:             return '#999'
   }
 }
@@ -147,6 +158,6 @@ export function getTimelineType(action: string): 'error' | 'warning' | 'info' | 
  * use the global CSS classes defined in global.css.
  */
 export const ROW_HIGHLIGHT_CSS = `
-.row-critical { background-color: rgba(232, 128, 128, 0.04); }
-.row-warning  { background-color: rgba(242, 201, 125, 0.04); }
+.row-critical { background-color: rgba(239, 68, 68, 0.04); }
+.row-warning  { background-color: rgba(245, 158, 11, 0.04); }
 `

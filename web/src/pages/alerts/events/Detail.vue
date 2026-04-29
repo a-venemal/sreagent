@@ -58,11 +58,21 @@ const userOptions = computed(() =>
 
 // Severity helpers
 const severityIconMap: Record<string, any> = {
+  p0: FlameOutline,
+  p1: FlameOutline,
+  p2: WarningOutline,
+  p3: WarningOutline,
+  p4: InformationCircleOutline,
   critical: FlameOutline,
   warning: WarningOutline,
   info: InformationCircleOutline,
 }
-const severityBannerClass = computed(() => `banner--${event.value?.severity ?? 'info'}`)
+const severityBannerClass = computed(() => {
+  const s = event.value?.severity ?? 'info'
+  if (s === 'p0' || s === 'critical') return 'banner--critical'
+  if (s === 'p1' || s === 'p2' || s === 'warning') return 'banner--warning'
+  return 'banner--info'
+})
 const severityIcon = computed(() => severityIconMap[event.value?.severity ?? 'info'] ?? InformationCircleOutline)
 
 // Duration

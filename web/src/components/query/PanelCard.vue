@@ -3,14 +3,14 @@ import { ref, computed, onMounted, watch, h, shallowRef } from 'vue'
 import { NDataTable, NEmpty, NSpin as NSpinComponent } from 'naive-ui'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
-import { LineChart, BarChart } from 'echarts/charts'
+import { LineChart, BarChart, PieChart, GaugeChart } from 'echarts/charts'
 import { TooltipComponent, LegendComponent, GridComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
 import { datasourceApi } from '@/api'
 import type { PanelConfig, PanelTarget } from '@/types/dashboard'
 import type { QueryResponse } from '@/types'
 
-use([CanvasRenderer, LineChart, BarChart, TooltipComponent, LegendComponent, GridComponent])
+use([CanvasRenderer, LineChart, BarChart, PieChart, GaugeChart, TooltipComponent, LegendComponent, GridComponent])
 
 const props = defineProps<{
   panel: PanelConfig
@@ -152,6 +152,66 @@ const chartOption = computed(() => {
   }
 })
 
+const barOption = computed(() => {
+  const base = chartOption.value
+  if (!base?.series) return null
+  const seriesList = base.series.map((s: any) => ({ ...s, type: 'bar', smooth: undefined, barMaxWidth: 40 }))
+  return { ...base, series: seriesList, tooltip: { trigger: 'axis' as const } }
+})
+
+const gaugeOption = computed(() => {
+  const val = statValue.value
+  if (val == null) return null
+  const max = props.panel.options?.max ?? 100
+  const thresholds: { value: number; color: string }[] = props.panel.options?.thresholds ?? []
+  const detailFormatter = props.panel.options?.unit ? `{value} ${props.panel.options.unit}` : '{value}'
+  return {
+    tooltip: { formatter: `{b}: {c}${props.panel.options?.unit ? ' ' + props.panel.options.unit : ''}` },
+    series: [{
+      type: 'gauge',
+      startAngle: 210,
+      endAngle: -30,
+      min: props.panel.options?.min ?? 0,
+      max,
+      center: ['50%', '58%'],
+      radius: '85%',
+      axisLine: {
+        lineStyle: {
+          width: 20,
+          color: thresholds.length
+            ? thresholds.map(t => [t.value / max, t.color])
+            : [[0.6, 'var(--sre-success)'], [0.8, 'var(--sre-warning)'], [1, 'var(--sre-danger)']],
+        },
+      },
+      pointer: { length: '60%', width: 6, itemStyle: { color: 'var(--sre-text-primary)' } },
+      detail: { valueAnimation: true, formatter: detailFormatter, fontSize: 20, offsetCenter: [0, '60%'] },
+      data: [{ value: val, name: statSeriesName.value }],
+    }],
+  }
+})
+
+const pieOption = computed(() => {
+  if (!series.value.length) return null
+  const data: { name: string; value: number }[] = []
+  for (const s of series.value) {
+    const name = s.labels?.__panel_name || s.labels?.__name__ || 'value'
+    const vals = s.values
+    if (vals?.length) data.push({ name, value: vals[vals.length - 1].value })
+  }
+  return {
+    tooltip: { trigger: 'item' as const },
+    legend: { type: 'scroll' as const, bottom: 0, textStyle: { fontSize: 11 } },
+    series: [{
+      type: 'pie',
+      radius: ['45%', '70%'],
+      center: ['50%', '48%'],
+      emphasis: { label: { fontSize: 16, fontWeight: 'bold' } },
+      label: { formatter: '{b}\n{d}%', fontSize: 11 },
+      data,
+    }],
+  }
+})
+
 const tableData = computed(() => {
   const rows: { labels: Record<string, string>; value: number; _key: number }[] = []
   let idx = 0
@@ -216,6 +276,21 @@ onMounted(fetchData)
           <div class="stat-value">{{ statValue?.toFixed(2) ?? '-' }}</div>
           <div class="stat-label">{{ statSeriesName }}</div>
         </div>
+      </template>
+
+      <!-- Gauge -->
+      <template v-else-if="panel.type === 'gauge'">
+        <VChart v-if="gaugeOption" :option="gaugeOption" autoresize style="height: 100%" />
+      </template>
+
+      <!-- Bar -->
+      <template v-else-if="panel.type === 'bar'">
+        <VChart v-if="barOption" :option="barOption" autoresize style="height: 100%" />
+      </template>
+
+      <!-- Pie -->
+      <template v-else-if="panel.type === 'pie'">
+        <VChart v-if="pieOption" :option="pieOption" autoresize style="height: 100%" />
       </template>
 
       <!-- Table -->

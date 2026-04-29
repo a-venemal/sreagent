@@ -45,7 +45,8 @@ type Handlers struct {
 	InhibitionRule   *handler.InhibitionRuleHandler
 	Heartbeat        *handler.HeartbeatHandler
 	LabelRegistry    *handler.LabelRegistryHandler
-	DashboardV2      *handler.DashboardV2Handler
+	DashboardV2         *handler.DashboardV2Handler
+	AlertRuleTemplate   *handler.AlertRuleTemplateHandler
 }
 
 // Setup initializes the Gin router with all routes and middleware.
@@ -65,6 +66,9 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
+
+	// Prometheus metrics endpoint (no auth) — exposes Go runtime + app metrics
+	r.GET("/metrics", handler.MetricsHandler)
 
 	// Webhook endpoint — authenticated by shared secret (X-Webhook-Secret header)
 	webhooks := r.Group("/webhooks", middleware.WebhookAuth(cfg.Server.WebhookSecret))
@@ -152,6 +156,20 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 				rules.DELETE("/:id", manage, handlers.AlertRule.Delete)
 				rules.PATCH("/:id/status", manage, handlers.AlertRule.ToggleStatus)
 				rules.POST("/import", manage, handlers.AlertRule.Import)
+			}
+
+			// Alert Rule Templates
+			if handlers.AlertRuleTemplate != nil {
+				templates := auth.Group("/alert-rule-templates")
+				{
+					templates.GET("", handlers.AlertRuleTemplate.List)
+					templates.GET("/categories", handlers.AlertRuleTemplate.ListCategories)
+					templates.GET("/:id", handlers.AlertRuleTemplate.Get)
+					templates.POST("", manage, handlers.AlertRuleTemplate.Create)
+					templates.PUT("/:id", manage, handlers.AlertRuleTemplate.Update)
+					templates.DELETE("/:id", manage, handlers.AlertRuleTemplate.Delete)
+					templates.POST("/:id/apply", manage, handlers.AlertRuleTemplate.Apply)
+				}
 			}
 
 			// Alert Events

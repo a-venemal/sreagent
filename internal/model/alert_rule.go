@@ -6,6 +6,11 @@ import "time"
 type AlertSeverity string
 
 const (
+	SeverityP0       AlertSeverity = "p0"
+	SeverityP1       AlertSeverity = "p1"
+	SeverityP2       AlertSeverity = "p2"
+	SeverityP3       AlertSeverity = "p3"
+	SeverityP4       AlertSeverity = "p4"
 	SeverityCritical AlertSeverity = "critical"
 	SeverityWarning  AlertSeverity = "warning"
 	SeverityInfo     AlertSeverity = "info"

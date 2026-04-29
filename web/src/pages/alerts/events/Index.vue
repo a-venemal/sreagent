@@ -74,6 +74,11 @@ const statusOptions = [
 ]
 
 const severityOptions = [
+  { label: () => t('alert.p0'), value: 'p0' },
+  { label: () => t('alert.p1'), value: 'p1' },
+  { label: () => t('alert.p2'), value: 'p2' },
+  { label: () => t('alert.p3'), value: 'p3' },
+  { label: () => t('alert.p4'), value: 'p4' },
   { label: () => t('alert.critical'), value: 'critical' },
   { label: () => t('alert.warning'), value: 'warning' },
   { label: () => t('alert.info'), value: 'info' },

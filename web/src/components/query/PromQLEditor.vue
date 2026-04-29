@@ -59,11 +59,15 @@ function createExtensions() {
 
 onMounted(() => {
   if (!editorRef.value) return
-  const state = EditorState.create({
-    doc: props.modelValue,
-    extensions: createExtensions(),
-  })
-  view.value = new EditorView({ state, parent: editorRef.value })
+  try {
+    const state = EditorState.create({
+      doc: props.modelValue,
+      extensions: createExtensions(),
+    })
+    view.value = new EditorView({ state, parent: editorRef.value })
+  } catch (e) {
+    console.error('Failed to initialize PromQL editor:', e)
+  }
 })
 
 onUnmounted(() => {
@@ -79,16 +83,20 @@ watch(() => props.modelValue, (val) => {
 })
 
 watch(() => props.datasourceId, () => {
-  // Recreate editor when datasource changes to update completion context
   if (view.value) {
     const doc = view.value.state.doc.toString()
     view.value.destroy()
+    view.value = undefined
     if (editorRef.value) {
-      const state = EditorState.create({
-        doc,
-        extensions: createExtensions(),
-      })
-      view.value = new EditorView({ state, parent: editorRef.value })
+      try {
+        const state = EditorState.create({
+          doc,
+          extensions: createExtensions(),
+        })
+        view.value = new EditorView({ state, parent: editorRef.value })
+      } catch (e) {
+        console.error('Failed to recreate PromQL editor:', e)
+      }
     }
   }
 })

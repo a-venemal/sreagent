@@ -118,6 +118,7 @@ func main() {
 
 	// Dashboard v2 repository
 	dashboardV2Repo := repository.NewDashboardRepository(db)
+	templateRepo := repository.NewAlertRuleTemplateRepository(db)
 
 	// Dispatch repositories
 	alertChannelRepo := repository.NewAlertChannelRepository(db)
@@ -161,6 +162,9 @@ func main() {
 
 	// Dashboard v2 service
 	dashboardV2Svc := service.NewDashboardService(dashboardV2Repo, zapLogger)
+
+	// Alert rule template service
+	templateSvc := service.NewAlertRuleTemplateService(templateRepo, zapLogger)
 
 	// Dispatch services
 	alertChannelSvc := service.NewAlertChannelService(alertChannelRepo, notifyMediaRepo, zapLogger)
@@ -433,6 +437,7 @@ func main() {
 		Heartbeat:        handler.NewHeartbeatHandler(ruleSvc),
 		LabelRegistry:    handler.NewLabelRegistryHandler(labelRegistrySvc),
 		DashboardV2:      handler.NewDashboardV2Handler(dashboardV2Svc),
+		AlertRuleTemplate:   handler.NewAlertRuleTemplateHandler(templateSvc),
 	}
 
 	// Inject audit service into handlers that support it

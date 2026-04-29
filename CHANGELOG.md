@@ -4,6 +4,28 @@
 
 ---
 
+## [v1.16.9] - 2026-04-29
+
+### Added
+- P0-P4 严重级别支持：model 常量、前端类型、i18n 标签（P0-紧急/P1-严重/P2-一般/P3-轻微/P4-信息）、表单和过滤器选项
+- `/metrics` 端点：Prometheus 暴露格式的 Go 运行时 + 应用指标
+- PanelCard 新增 gauge/bar/pie 图表类型（ECharts GaugeChart + BarChart + PieChart）
+- Dashboard V2 面板拖拽布局：拖拽标题栏移动面板位置 + 右下角拖拽调整面板尺寸（CSS Grid 24 列）
+- Dashboard V2 面板类型扩展按钮：统计值/时序图/仪表盘/柱状图/饼图/表格
+- 告警规则模板系统：CRUD + 分类 + "从模板加载"/"保存为模板"（前后端完整实现）
+  - Model: `alert_rule_templates` 表（迁移: 000018_alert_rule_templates）
+  - API: GET/POST/PUT/DELETE `/api/v1/alert-rule-templates` + `/categories` + `/:id/apply`
+  - 前端：创建规则时可从模板加载，编辑时可保存为模板
+
+### Changed
+- Alert Detail 页面硬编码颜色全部替换为 CSS 自定义属性（banner、timeline、lifecycle、labels、annotations、responders）
+- PanelCard Stat 面板支持阈值颜色：`panel.options.thresholds` 数组 `[{ value, color }]` 自动根据当前值匹配颜色
+
+### Fixed
+- PromQLEditor 防御性错误处理：onMounted 和 datasourceId watcher 中 EditorState.create 增加 try-catch
+
+---
+
 ## [v1.16.8] - 2026-04-29
 
 ### Changed

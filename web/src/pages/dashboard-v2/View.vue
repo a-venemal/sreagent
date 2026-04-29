@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton, NSpace, NInput, useMessage, NModal, NPopconfirm } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
@@ -29,6 +29,109 @@ const config = ref<DashboardConfig>({
   panels: [],
   layout: { cols: 24, rowHeight: 100 },
   variables: [],
+})
+
+// --- Panel drag / resize ---
+const GRID_COLS = 24
+const MIN_W = 2
+const MIN_H = 2
+const GAP = 12
+
+interface DragState {
+  panelId: string
+  mode: 'move' | 'resize'
+  startX: number
+  startY: number
+  origX: number
+  origY: number
+  origW: number
+  origH: number
+}
+
+const dragState = ref<DragState | null>(null)
+const gridEl = ref<HTMLElement | null>(null)
+const cellW = ref(100)
+
+function recalcCellW() {
+  if (gridEl.value) {
+    const w = gridEl.value.clientWidth
+    cellW.value = (w - (GRID_COLS - 1) * GAP) / GRID_COLS
+  }
+}
+
+function onGridResize() {
+  recalcCellW()
+}
+
+function startDrag(e: MouseEvent, panel: PanelConfig) {
+  if ((e.target as HTMLElement).closest('button, input, .panel-drag-handle-resize')) return
+  e.preventDefault()
+  recalcCellW()
+  dragState.value = {
+    panelId: panel.id,
+    mode: 'move',
+    startX: e.clientX,
+    startY: e.clientY,
+    origX: panel.gridPos.x,
+    origY: panel.gridPos.y,
+    origW: panel.gridPos.w,
+    origH: panel.gridPos.h,
+  }
+  document.addEventListener('mousemove', onDrag)
+  document.addEventListener('mouseup', stopDrag)
+}
+
+function startResize(e: MouseEvent, panel: PanelConfig) {
+  e.preventDefault()
+  e.stopPropagation()
+  recalcCellW()
+  dragState.value = {
+    panelId: panel.id,
+    mode: 'resize',
+    startX: e.clientX,
+    startY: e.clientY,
+    origX: panel.gridPos.x,
+    origY: panel.gridPos.y,
+    origW: panel.gridPos.w,
+    origH: panel.gridPos.h,
+  }
+  document.addEventListener('mousemove', onDrag)
+  document.addEventListener('mouseup', stopDrag)
+}
+
+function onDrag(e: MouseEvent) {
+  const ds = dragState.value
+  if (!ds) return
+  const panel = config.value.panels.find(p => p.id === ds.panelId)
+  if (!panel) return
+
+  const cw = cellW.value || 1
+  const rowH = config.value.layout?.rowHeight || 100
+  const dx = Math.round((e.clientX - ds.startX) / (cw + GAP / GRID_COLS))
+  const dy = Math.round((e.clientY - ds.startY) / (rowH + GAP))
+
+  if (ds.mode === 'move') {
+    const nx = Math.max(0, Math.min(GRID_COLS - panel.gridPos.w, ds.origX + dx))
+    const ny = Math.max(0, ds.origY + dy)
+    panel.gridPos.x = nx
+    panel.gridPos.y = ny
+  } else {
+    const nw = Math.max(MIN_W, Math.min(GRID_COLS - panel.gridPos.x, ds.origW + dx))
+    const nh = Math.max(MIN_H, ds.origH + dy)
+    panel.gridPos.w = nw
+    panel.gridPos.h = nh
+  }
+}
+
+function stopDrag() {
+  dragState.value = null
+  document.removeEventListener('mousemove', onDrag)
+  document.removeEventListener('mouseup', stopDrag)
+}
+
+onBeforeUnmount(() => {
+  document.removeEventListener('mousemove', onDrag)
+  document.removeEventListener('mouseup', stopDrag)
 })
 
 const datasources = ref<DataSource[]>([])
@@ -222,17 +325,18 @@ onMounted(() => {
     </div>
 
     <!-- PANEL GRID -->
-    <div v-if="hasPanels" class="panel-grid">
+    <div v-if="hasPanels" ref="gridEl" class="panel-grid" @mousemove="onGridResize">
       <div
         v-for="panel in config.panels"
         :key="panel.id"
         class="panel-grid-item"
+        :class="{ 'panel-dragging': dragState?.panelId === panel.id && dragState?.mode === 'move', 'panel-resizing': dragState?.panelId === panel.id && dragState?.mode === 'resize' }"
         :style="{
           gridColumn: `${(panel.gridPos?.x || 0) + 1} / span ${panel.gridPos?.w || 24}`,
           gridRow: `${(panel.gridPos?.y || 0) + 1} / span ${panel.gridPos?.h || 6}`,
         }"
       >
-        <div class="panel-toolbar">
+        <div class="panel-toolbar panel-drag-handle" @mousedown="(e: MouseEvent) => startDrag(e, panel)">
           <NInput
             :value="panel.title"
             size="tiny"
@@ -244,6 +348,9 @@ onMounted(() => {
           </NSpace>
         </div>
         <PanelCard :panel="panel" :time-range="timeRange" />
+        <div class="panel-drag-handle-resize" @mousedown="(e: MouseEvent) => startResize(e, panel)">
+          <svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 10 L10 0 M4 10 L10 4 M8 10 L10 8" stroke="currentColor" fill="none" opacity="0.4"/></svg>
+        </div>
       </div>
     </div>
 
@@ -274,6 +381,9 @@ onMounted(() => {
           <NSpace size="small">
             <NButton size="tiny" secondary @click="addPanelFromQuery('timeseries')">{{ t('dashboardV2.panelTimeseries') || 'Chart' }}</NButton>
             <NButton size="tiny" secondary @click="addPanelFromQuery('stat')">{{ t('dashboardV2.panelStat') || 'Stat' }}</NButton>
+            <NButton size="tiny" secondary @click="addPanelFromQuery('gauge')">{{ t('dashboardV2.panelGauge') || 'Gauge' }}</NButton>
+            <NButton size="tiny" secondary @click="addPanelFromQuery('bar')">{{ t('dashboardV2.panelBar') || 'Bar' }}</NButton>
+            <NButton size="tiny" secondary @click="addPanelFromQuery('pie')">{{ t('dashboardV2.panelPie') || 'Pie' }}</NButton>
             <NButton size="tiny" secondary @click="addPanelFromQuery('table')">{{ t('dashboardV2.panelTable') || 'Table' }}</NButton>
           </NSpace>
         </div>
@@ -346,6 +456,44 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 200px;
+  position: relative;
+  transition: opacity 0.15s ease;
+}
+.panel-grid-item.panel-dragging {
+  opacity: 0.7;
+  z-index: 10;
+  cursor: grabbing;
+}
+.panel-grid-item.panel-resizing {
+  opacity: 0.85;
+  z-index: 10;
+}
+.panel-drag-handle {
+  cursor: grab;
+  user-select: none;
+}
+.panel-drag-handle:active {
+  cursor: grabbing;
+}
+.panel-drag-handle-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  color: var(--sre-text-tertiary);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+.panel-grid-item:hover .panel-drag-handle-resize {
+  opacity: 1;
+}
+.panel-drag-handle-resize:hover {
+  color: var(--sre-text-primary);
 }
 .panel-toolbar {
   display: flex;
