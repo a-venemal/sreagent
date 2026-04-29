@@ -46,10 +46,6 @@ const selectedDs = computed(() =>
 
 const isLogsMode = computed(() => selectedDs.value?.type === 'victorialogs')
 
-const metricsDatasources = computed(() =>
-  datasources.value.filter(ds => ds.type !== 'victorialogs')
-)
-
 const hasResults = computed(() =>
   targets.value.some(t => t.series && t.series.length > 0)
 )
@@ -64,7 +60,7 @@ const logError = ref('')
 
 const logColumns: DataTableColumns<LogEntry> = [
   {
-    title: 'Time',
+    title: t('explore.logTime') || 'Time',
     key: 'timestamp',
     width: 200,
     render(row) {
@@ -74,13 +70,13 @@ const logColumns: DataTableColumns<LogEntry> = [
     },
   },
   {
-    title: 'Message',
+    title: t('explore.logMessage') || 'Message',
     key: 'message',
     ellipsis: { tooltip: true },
     render(row) { return row.message || '-' },
   },
   {
-    title: 'Labels',
+    title: t('explore.logLabels') || 'Labels',
     key: 'labels',
     width: 400,
     render(row) {
@@ -93,9 +89,17 @@ const logColumns: DataTableColumns<LogEntry> = [
   },
 ]
 
-// --- Watch datasource changes ---
-watch(selectedDsId, () => {
-  // Reset log state when switching datasources
+// --- Sync top-level datasource to all targets ---
+watch(selectedDsId, (newId) => {
+  if (newId && !isLogsMode.value) {
+    // Update all existing targets to use the selected datasource
+    for (const target of targets.value) {
+      if (target.datasourceId !== newId) {
+        updateTarget(target.id, { datasourceId: newId })
+      }
+    }
+  }
+  // Reset log state when switching
   expression.value = ''
   logEntries.value = []
   logError.value = ''
@@ -121,6 +125,17 @@ function handleExecuteSingle(id: string) {
   if (target) executeQuery(target)
 }
 
+function handleAddTarget() {
+  addTarget()
+  // Sync datasource to the new target
+  if (selectedDsId.value) {
+    const last = targets.value[targets.value.length - 1]
+    if (last && !last.datasourceId) {
+      updateTarget(last.id, { datasourceId: selectedDsId.value })
+    }
+  }
+}
+
 // --- Logs mode ---
 async function executeLogQuery() {
   if (!selectedDsId.value || !expression.value.trim()) return
@@ -142,7 +157,7 @@ async function executeLogQuery() {
     logEntries.value = data.entries || []
     truncated.value = data.truncated || false
   } catch (err: any) {
-    logError.value = err?.message || t('explore.queryFailed') || 'Query failed'
+    logError.value = err?.message || t('explore.queryFailed')
   } finally {
     logLoading.value = false
   }
@@ -154,29 +169,26 @@ function handleLogKeydown(e: KeyboardEvent) {
   }
 }
 
-// --- Auto-refresh handler ---
-watch(autoRefreshInterval, () => {
-  // Auto-refresh is handled by useQueryEngine for metrics mode.
-  // For logs mode, we need a manual watcher.
-  if (isLogsMode.value && selectedDsId.value && expression.value.trim()) {
-    // The interval is managed by useTimeRange; we just need executeLogQuery to be callable.
-    // The actual periodic execution is handled by the setInterval in useTimeRange,
-    // but we need to wire it up. For now, auto-refresh only works in metrics mode.
-  }
-})
-
 onMounted(fetchDatasources)
 </script>
 
 <template>
   <div class="explore-page">
-    <!-- Shared Header -->
+    <!-- Header -->
     <div class="explore-header">
       <div class="header-left">
         <h2 class="page-title">{{ t('explore.title') }}</h2>
         <span class="page-subtitle">{{ t('explore.subtitle') }}</span>
       </div>
       <div class="header-right">
+        <n-select
+          v-model:value="selectedDsId"
+          :options="datasources.map(ds => ({ label: `${ds.name} (${ds.type})`, value: ds.id }))"
+          :placeholder="t('explore.selectDatasource')"
+          filterable
+          style="width: 280px"
+          size="small"
+        />
         <TimeRangePicker
           :time-range="timeRange"
           :is-relative="isRelative"
@@ -191,30 +203,17 @@ onMounted(fetchDatasources)
       </div>
     </div>
 
-    <!-- Datasource Selector Bar -->
-    <div class="ds-selector-bar">
-      <n-select
-        v-model:value="selectedDsId"
-        :options="datasources.map(ds => ({ label: `${ds.name} (${ds.type})`, value: ds.id }))"
-        :placeholder="t('explore.selectDatasource')"
-        filterable
-        style="width: 320px"
-        size="small"
-      />
-    </div>
-
     <!-- No datasource selected -->
     <div v-if="!selectedDsId" class="empty-state">
       <n-empty :description="t('explore.selectDatasource')" />
     </div>
 
-    <!-- METRICS MODE (Prometheus / VictoriaMetrics) -->
+    <!-- METRICS MODE -->
     <template v-if="selectedDsId && !isLogsMode">
       <QueryPanel
         :targets="targets"
-        :datasources="metricsDatasources"
         :loading="globalLoading"
-        @add="addTarget"
+        @add="handleAddTarget"
         @remove="removeTarget"
         @toggle="toggleTarget"
         @update="updateTarget"
@@ -238,7 +237,7 @@ onMounted(fetchDatasources)
       </div>
     </template>
 
-    <!-- LOGS MODE (VictoriaLogs) -->
+    <!-- LOGS MODE -->
     <template v-if="selectedDsId && isLogsMode">
       <div class="query-bar">
         <n-input
@@ -274,9 +273,9 @@ onMounted(fetchDatasources)
       <div class="results-section">
         <div class="results-header" v-if="logEntries.length > 0">
           <span class="results-count">
-            {{ t('explore.showing') || 'Showing' }} {{ logEntries.length }} {{ t('explore.entries') || 'entries' }}
+            {{ t('explore.showing') }} {{ logEntries.length }} {{ t('explore.entries') }}
             <n-tag v-if="truncated" type="warning" size="small" style="margin-left: 8px">
-              {{ t('explore.truncated') || 'Truncated' }}
+              {{ t('explore.truncated') }}
             </n-tag>
           </span>
         </div>
@@ -333,12 +332,6 @@ onMounted(fetchDatasources)
   display: flex;
   align-items: center;
   gap: 8px;
-}
-.ds-selector-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
 }
 .query-bar {
   display: flex;

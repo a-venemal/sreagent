@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { NSelect, NInput, NButton, NIcon, NSpace } from 'naive-ui'
+import { NInput, NButton, NSpace } from 'naive-ui'
 import PromQLEditor from './PromQLEditor.vue'
-import type { QueryTarget, QuerySeriesItem } from '@/types/query'
-import type { DataSource } from '@/types'
+import type { QueryTarget } from '@/types/query'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 defineProps<{
   target: QueryTarget
-  datasources: DataSource[]
   index: number
   canRemove: boolean
 }>()
@@ -25,16 +26,12 @@ function onExprUpdate(id: string, value: string) {
 function onLegendUpdate(id: string, value: string) {
   emit('update', id, { legendFormat: value })
 }
-
-function onDsUpdate(id: string, value: number) {
-  emit('update', id, { datasourceId: value })
-}
 </script>
 
 <template>
   <div class="query-row" :class="{ disabled: !target.enabled }">
     <div class="query-row-header">
-      <span class="query-label">Query {{ String.fromCharCode(65 + index) }}</span>
+      <span class="query-label">{{ t('explore.queryLabel', { n: String.fromCharCode(65 + index) }) }}</span>
       <NSpace size="small">
         <NButton
           quaternary
@@ -57,21 +54,11 @@ function onDsUpdate(id: string, value: number) {
     </div>
 
     <div class="query-row-body">
-      <NSelect
-        :value="target.datasourceId"
-        :options="datasources.map(ds => ({ label: `${ds.name} (${ds.type})`, value: ds.id }))"
-        placeholder="Select datasource"
-        filterable
-        size="small"
-        style="width: 240px; flex-shrink: 0"
-        @update:value="(v: number) => onDsUpdate(target.id, v)"
-      />
-
       <div class="editor-wrapper">
         <PromQLEditor
           :model-value="target.expression"
           :datasource-id="target.datasourceId"
-          placeholder="Enter PromQL expression... (Ctrl+Enter to execute)"
+          :placeholder="t('explore.enterExpression')"
           @update:model-value="(v: string) => onExprUpdate(target.id, v)"
           @execute="emit('execute', target.id)"
         />
@@ -79,7 +66,7 @@ function onDsUpdate(id: string, value: number) {
 
       <NInput
         :value="target.legendFormat"
-        placeholder="Legend: {{instance}}"
+        :placeholder="t('explore.legendFormat')"
         size="small"
         style="width: 200px; flex-shrink: 0"
         @update:value="(v: string) => onLegendUpdate(target.id, v)"

@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { NButton, NSpace, NIcon } from 'naive-ui'
+import { NButton, NSpace } from 'naive-ui'
+import { useI18n } from 'vue-i18n'
 import QueryRow from './QueryRow.vue'
 import type { QueryTarget } from '@/types/query'
-import type { DataSource } from '@/types'
+
+const { t } = useI18n()
 
 defineProps<{
   targets: QueryTarget[]
-  datasources: DataSource[]
   loading: boolean
 }>()
 
@@ -26,7 +27,6 @@ const emit = defineEmits<{
       v-for="(target, i) in targets"
       :key="target.id"
       :target="target"
-      :datasources="datasources"
       :index="i"
       :can-remove="targets.length > 1"
       @remove="(id) => emit('remove', id)"
@@ -38,7 +38,7 @@ const emit = defineEmits<{
     <div class="query-panel-actions">
       <NSpace>
         <NButton dashed size="small" @click="emit('add')">
-          + Add Query
+          + {{ t('explore.addQuery') }}
         </NButton>
         <NButton
           type="primary"
@@ -47,7 +47,7 @@ const emit = defineEmits<{
           :disabled="!targets.some(t => t.enabled && t.datasourceId && t.expression.trim())"
           @click="emit('executeAll')"
         >
-          Run Queries
+          {{ t('explore.runQueries') }}
         </NButton>
       </NSpace>
     </div>

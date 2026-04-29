@@ -207,6 +207,10 @@ export default {
     truncated: 'Truncated',
     logEmptyDesc: 'Enter a LogsQL query and click Run Query to view logs',
     queryFailed: 'Query failed',
+    queryLabel: 'Query {n}',
+    logTime: 'Time',
+    logMessage: 'Message',
+    logLabels: 'Labels',
   },
   alert: {
     rules: 'Alert Rules',

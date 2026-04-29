@@ -207,6 +207,10 @@ export default {
     truncated: '结果已截断',
     logEmptyDesc: '输入 LogsQL 查询并点击执行查询以查看日志',
     queryFailed: '查询失败',
+    queryLabel: '查询 {n}',
+    logTime: '时间',
+    logMessage: '日志内容',
+    logLabels: '标签',
   },
   dashboardV2: {
     title: '仪表盘',
