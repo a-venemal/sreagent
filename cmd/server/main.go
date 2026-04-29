@@ -24,6 +24,8 @@ import (
 
 	"github.com/sreagent/sreagent/internal/config"
 	"github.com/sreagent/sreagent/internal/engine"
+	"github.com/sreagent/sreagent/internal/engine/pipeline"
+	_ "github.com/sreagent/sreagent/internal/engine/pipeline/processor"
 	"github.com/sreagent/sreagent/internal/handler"
 	"github.com/sreagent/sreagent/internal/model"
 	"github.com/sreagent/sreagent/internal/pkg/datasource"
@@ -119,6 +121,10 @@ func main() {
 	// Dashboard v2 repository
 	dashboardV2Repo := repository.NewDashboardRepository(db)
 
+	// Event pipeline repositories
+	pipelineRepo := repository.NewEventPipelineRepository(db)
+	pipelineExecRepo := repository.NewPipelineExecutionRepository(db)
+
 	// Dispatch repositories
 	alertChannelRepo := repository.NewAlertChannelRepository(db)
 	userNotifyConfigRepo := repository.NewUserNotifyConfigRepository(db)
@@ -161,6 +167,10 @@ func main() {
 
 	// Dashboard v2 service
 	dashboardV2Svc := service.NewDashboardService(dashboardV2Repo, zapLogger)
+
+	// Event pipeline engine and service
+	pipelineEngine := pipeline.NewEngine(zapLogger, pipelineExecRepo)
+	pipelineSvc := service.NewEventPipelineService(pipelineRepo, pipelineExecRepo, pipelineEngine, zapLogger)
 
 	// Dispatch services
 	alertChannelSvc := service.NewAlertChannelService(alertChannelRepo, notifyMediaRepo, zapLogger)
@@ -304,7 +314,7 @@ func main() {
 	)
 
 	// Shared onAlert callback used by both the evaluator and heartbeat checker.
-	// Pipeline: inhibition → mute → bizgroup → group → notify.
+	// Pipeline: inhibition → mute → bizgroup → event-pipeline → group → notify.
 	onAlertFn := func(ctx context.Context, event *model.AlertEvent) {
 		// 1. Check inhibition rules (suppress target alerts when source is firing).
 		firingEvents, _, _ := eventSvc.List(ctx, "firing", "", 1, 2000)
@@ -345,7 +355,21 @@ func main() {
 			_ = eventRepo.UpdateLabels(ctx, event.ID, event.Labels)
 		}
 
-		// 4. Route notification (through group manager for group_wait/group_interval).
+		// 4. Execute event pipelines (programmable processing chain).
+		if result, err := pipelineSvc.ExecuteMatching(ctx, event); err != nil {
+			zapLogger.Error("pipeline execution failed",
+				zap.Uint("event_id", event.ID),
+				zap.Error(err),
+			)
+		} else if result != nil && result.Terminated {
+			zapLogger.Info("event dropped by pipeline",
+				zap.Uint("event_id", event.ID),
+				zap.String("pipeline_msg", result.Message),
+			)
+			return
+		}
+
+		// 5. Route notification (through group manager for group_wait/group_interval).
 		if err := alertGroupMgr.ProcessEvent(ctx, event); err != nil {
 			zapLogger.Error("failed to route alert notification",
 				zap.Uint("event_id", event.ID),
@@ -425,6 +449,7 @@ func main() {
 		Heartbeat:        handler.NewHeartbeatHandler(ruleSvc),
 		LabelRegistry:    handler.NewLabelRegistryHandler(labelRegistrySvc),
 		DashboardV2:      handler.NewDashboardV2Handler(dashboardV2Svc),
+		EventPipeline:    handler.NewEventPipelineHandler(pipelineSvc),
 	}
 
 	// Inject audit service into handlers that support it
@@ -592,6 +617,10 @@ func autoMigrate(db *gorm.DB) error {
 
 	// Dashboards (v2 — panel/variable config stored in JSON)
 	models = append(models, &model.Dashboard{})
+
+	// Event pipelines (programmable alert processing chains)
+	models = append(models, &model.EventPipeline{})
+	models = append(models, &model.PipelineExecution{})
 
 	return db.AutoMigrate(models...)
 }

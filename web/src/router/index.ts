@@ -103,6 +103,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'On-Call Schedule', icon: 'calendar' },
       },
       {
+        path: 'pipelines',
+        name: 'Pipelines',
+        component: () => import('@/pages/pipelines/Index.vue'),
+        meta: { title: 'Pipelines', icon: 'pipeline', requiresRole: ['admin', 'team_lead'] },
+      },
+      {
+        path: 'pipelines/:id',
+        name: 'PipelineEditor',
+        component: () => import('@/pages/pipelines/Editor.vue'),
+        meta: { title: 'Pipeline Editor', icon: 'pipeline' },
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('@/pages/settings/Index.vue'),

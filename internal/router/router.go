@@ -46,6 +46,7 @@ type Handlers struct {
 	Heartbeat        *handler.HeartbeatHandler
 	LabelRegistry    *handler.LabelRegistryHandler
 	DashboardV2      *handler.DashboardV2Handler
+	EventPipeline    *handler.EventPipelineHandler
 }
 
 // Setup initializes the Gin router with all routes and middleware.
@@ -432,6 +433,18 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 					dashV2.POST("", manage, handlers.DashboardV2.Create)
 					dashV2.PUT("/:id", manage, handlers.DashboardV2.Update)
 					dashV2.DELETE("/:id", manage, handlers.DashboardV2.Delete)
+				}
+
+				// Event Pipelines (programmable alert processing)
+				pipelines := auth.Group("/event-pipelines")
+				{
+					pipelines.GET("", handlers.EventPipeline.List)
+					pipelines.GET("/:id", handlers.EventPipeline.Get)
+					pipelines.POST("", manage, handlers.EventPipeline.Create)
+					pipelines.PUT("/:id", manage, handlers.EventPipeline.Update)
+					pipelines.DELETE("/:id", manage, handlers.EventPipeline.Delete)
+					pipelines.POST("/tryrun", manage, handlers.EventPipeline.TryRun)
+					pipelines.GET("/:id/executions", handlers.EventPipeline.ListExecutions)
 				}
 		}
 	}

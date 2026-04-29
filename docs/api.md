@@ -1114,7 +1114,74 @@ AI 驱动的告警分析。支持 LLM 生成的告警报告和 SOP 建议。
 
 ---
 
-## 24. Webhook
+## 24. Event Pipeline（可编程告警处理链）
+
+### GET `/event-pipelines` — 列表
+
+**访问级别：** 已认证
+
+查询参数：`?page=1&page_size=20&search=xxx`
+
+### GET `/event-pipelines/:id` — 详情
+
+**访问级别：** 已认证
+
+### POST `/event-pipelines` — 创建
+
+**访问级别：** 管理权限
+
+**请求体：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | 是 | Pipeline 名称 |
+| `description` | string | 否 | 描述 |
+| `disabled` | bool | 否 | 是否禁用 |
+| `filter_enable` | bool | 否 | 是否启用前置标签过滤 |
+| `label_filters` | []LabelFilter | 否 | 前置过滤条件 |
+| `nodes` | []PipelineNode | 否 | DAG 节点列表 |
+| `connections` | map | 否 | DAG 连接关系 |
+
+**PipelineNode 结构：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | string | 节点 ID |
+| `name` | string | 节点名称 |
+| `type` | string | 处理器类型：`if`, `relabel`, `event_drop`, `callback`, `ai_summary` |
+| `config` | object | 处理器专属配置 |
+| `disabled` | bool | 是否禁用 |
+| `continue_on_fail` | bool | 失败是否继续 |
+| `retry_on_fail` | bool | 失败是否重试 |
+
+### PUT `/event-pipelines/:id` — 更新
+
+**访问级别：** 管理权限（请求体同创建）
+
+### DELETE `/event-pipelines/:id` — 删除
+
+**访问级别：** 管理权限
+
+### POST `/event-pipelines/tryrun` — 试运行
+
+**访问级别：** 管理权限
+
+**请求体：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `pipeline_id` | uint | 是 | Pipeline ID |
+| `event` | AlertEvent | 是 | 模拟告警事件 |
+
+### GET `/event-pipelines/:id/executions` — 执行记录
+
+**访问级别：** 已认证
+
+查询参数：`?page=1&page_size=20`
+
+---
+
+## 25. Webhook
 
 ### POST `/webhooks/alertmanager` — Alertmanager Webhook
 
@@ -1186,8 +1253,8 @@ AI 驱动的告警分析。支持 LLM 生成的告警报告和 SOP 建议。
 | 类别 | 数量 | 访问级别 |
 |------|------|----------|
 | 公开（无需认证） | 10 | 健康检查、登录、OIDC、Webhook、飞书回调、操作页面 |
-| 只读（已认证） | 36 | 所有 GET/列表端点 |
+| 只读（已认证） | 38 | 所有 GET/列表端点 |
 | 操作权限（member 及以上） | 12 | 告警操作、订阅规则 |
-| 管理权限（team_lead 及以上） | 35 | 配置 CRUD、渠道、规则、排班、团队 |
+| 管理权限（team_lead 及以上） | 39 | 配置 CRUD、渠道、规则、排班、团队、Pipeline |
 | 仅管理员 | 10 | 用户 CRUD、系统设置、AI/飞书配置 |
 | **合计** | **~87** | |

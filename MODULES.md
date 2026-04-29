@@ -1,7 +1,7 @@
 # 模块清单 (MODULES)
 
-> 最后更新: 2026-04-29 | tag: v1.14.0
-> 共 22 个 model, 30 个 handler, 29 个 service, 21 个 repository, 120+ API 端点
+> 最后更新: 2026-04-29 | tag: v1.15.0
+> 共 24 个 model, 31 个 handler, 30 个 service, 23 个 repository, 125+ API 端点
 
 ---
 
@@ -9,6 +9,8 @@
 
 ```
 webhook ──────────→ alert-engine ←──── alert-rule (读取规则)
+                       │    ↑
+                       │    └── event-pipeline (onAlertFn 拦截，处理后继续通知)
                        │    ↑
                        │    └── datasource (查询数据)
                        │    └── label-registry (标签匹配)
@@ -52,6 +54,7 @@ dashboard ──→ alert-event (统计数据)
 | 系统设置 | ✅ | ❌ | ❌ | 0% |
 | 审计日志 | ✅ | ❌ | ❌ | 0% |
 | Webhook 入站 | ✅ | ❌ | ❌ | 0% |
+| 可编程处理链 | ✅ | ❌ | ❌ | 0% |
 
 > 目标：service 层 > 60%，handler 层 > 40%（v1.11.0 起逐步补全）
 
@@ -64,6 +67,16 @@ dashboard ──→ alert-event (统计数据)
 - **API**: `GET /engine/status`
 - **状态**: ✅ 核心完成（含 heartbeat、inhibition、group_wait/interval）
 - **文档**: [docs/alert-engine.md](docs/alert-engine.md)
+
+## 可编程告警处理链 (event-pipeline)
+
+- **功能**: DAG 可视化编辑器、5 种处理器（If/Relabel/EventDrop/Callback/AISummary）、执行记录、试运行
+- **后端文件**: `internal/model/event_pipeline.go`, `internal/engine/pipeline/` (8 files), `internal/handler/event_pipeline.go`, `internal/service/event_pipeline.go`, `internal/repository/event_pipeline.go`
+- **前端文件**: `web/src/pages/pipelines/Index.vue`, `web/src/pages/pipelines/Editor.vue`, `web/src/types/pipeline.ts`
+- **API**: `/api/v1/event-pipelines` (7 endpoints: CRUD + tryrun + executions)
+- **依赖**: 告警引擎（onAlertFn 拦截点）
+- **状态**: ✅ 完成
+- **迁移**: 000017_event_pipelines
 
 ## 告警规则 (alert-rule)
 

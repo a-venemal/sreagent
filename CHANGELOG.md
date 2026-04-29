@@ -4,6 +4,19 @@
 
 ---
 
+## [v1.15.0] - 2026-04-29
+
+### Added
+- 可编程告警处理链（Event Pipeline）：DAG 可视化编辑器 + 5 种处理器
+- 处理器：If（条件分支）、Relabel（标签操作）、EventDrop（告警丢弃）、Callback（Webhook 回调）、AISummary（AI 摘要）
+- Pipeline CRUD 端点：`/api/v1/event-pipelines`（7 个端点）
+- Pipeline 试运行：`POST /api/v1/event-pipelines/tryrun`
+- Pipeline 执行记录：`GET /api/v1/event-pipelines/:id/executions`
+- 前端 Pipeline 列表页 + DAG 编辑器（原生 SVG + 拖拽连线）
+- 前端节点配置面板（右侧抽屉，支持各处理器类型专属配置）
+- Pipeline 引擎集成到 onAlertFn（inhibition → mute → bizgroup → **pipeline** → notify）
+- 迁移: 000017_event_pipelines
+
 ## [v1.14.0] - 2026-04-29
 
 ### Added
