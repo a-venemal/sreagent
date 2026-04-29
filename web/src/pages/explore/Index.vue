@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, h, shallowRef } from 'vue'
+import { ref, onMounted, computed, watch, h } from 'vue'
 import { NTabs, NTabPane, NDataTable, NEmpty, NSpin, NTag, NAlert, NButton, NSelect, NInputNumber } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
@@ -77,11 +77,12 @@ const chartOption = computed(() => {
   const seen = new Map<string, boolean>()
 
   for (const s of series.value) {
-    const labelStr = Object.entries(s.labels)
+    const labels = s.labels || {}
+    const labelStr = Object.entries(labels)
       .filter(([k]) => k !== '__name__')
       .map(([k, v]) => `${k}=${v}`)
       .join(',')
-    const name = labelStr || s.labels.__name__ || 'value'
+    const name = labelStr || labels.__name__ || 'value'
 
     if (resultType.value === 'vector') {
       const displayName = name || 'value'
@@ -90,7 +91,7 @@ const chartOption = computed(() => {
         seriesList.push({
           name: displayName,
           type: 'bar',
-          data: s.values.map(v => v.value),
+          data: (s.values || []).map(v => v.value ?? 0),
         })
         xData.push(displayName)
       }
@@ -107,9 +108,9 @@ const chartOption = computed(() => {
       }
       const target = seriesList.find(sl => sl.name === name)
       if (target) {
-        for (const v of s.values) {
-          const ts = new Date(v.ts * 1000).toLocaleTimeString()
-          target.data.push([ts, v.value])
+        for (const v of (s.values || [])) {
+          const ts = new Date((v.ts || 0) * 1000).toLocaleTimeString()
+          target.data.push([ts, v.value ?? 0])
         }
       }
     }
@@ -153,14 +154,14 @@ const chartOption = computed(() => {
 // --- Metrics columns ---
 const metricsColumns: DataTableColumns<{ labels: Record<string, string>; value: number }> = [
   { title: t('explore.metricName') || 'Metric', key: 'name', ellipsis: { tooltip: true },
-    render(row) { return row.labels.__name__ || '-' },
+    render(row) { return row.labels?.__name__ || '-' },
   },
   { title: t('explore.value') || 'Value', key: 'value', width: 140,
     render(row) { return row.value?.toFixed(4) || '-' },
   },
   { title: t('explore.labelsHeader') || 'Labels', key: 'labels', ellipsis: { tooltip: true },
     render(row) {
-      const lbs = { ...row.labels }
+      const lbs = { ...(row.labels || {}) }
       delete lbs.__name__
       return Object.entries(lbs).map(([k, v]) => `${k}=${v}`).join(' ') || '-'
     },
@@ -171,8 +172,8 @@ const tableData = computed(() => {
   const rows: { labels: Record<string, string>; value: number; _key: number }[] = []
   let idx = 0
   for (const s of series.value) {
-    for (const v of s.values) {
-      rows.push({ labels: s.labels, value: v.value, _key: idx++ })
+    for (const v of (s.values || [])) {
+      rows.push({ labels: s.labels || {}, value: v.value ?? 0, _key: idx++ })
     }
   }
   return rows
@@ -273,10 +274,16 @@ watch(autoRefreshInterval, (val) => {
   }
 })
 
+// --- Datasource options (computed, not inline map in template) ---
+const datasourceOptions = computed(() =>
+  datasources.value.map(ds => ({ label: ds.name, value: ds.id }))
+)
+
 async function fetchDatasources() {
   try {
     const res = await datasourceApi.list({ page: 1, page_size: 100 })
-    datasources.value = (res.data.data.list || []).filter((ds: any) => ds.is_enabled)
+    const list = res.data?.data?.list
+    datasources.value = (Array.isArray(list) ? list : []).filter((ds: any) => ds.is_enabled)
     if (datasources.value.length > 0 && !selectedDsId.value) {
       selectedDsId.value = datasources.value[0].id
     }
@@ -315,11 +322,7 @@ onMounted(fetchDatasources)
     <div class="ds-select-row">
       <n-select
         v-model:value="selectedDsId"
-        :options="datasources.map(ds => ({
-          label: ds.name,
-          value: ds.id,
-          tag: ds.type,
-        }))"
+        :options="datasourceOptions"
         :placeholder="t('explore.selectDatasource')"
         filterable
         style="width: 320px"

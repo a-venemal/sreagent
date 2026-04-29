@@ -4,6 +4,11 @@
 
 ---
 
+## [v1.16.10] - 2026-04-29
+
+### Fixed
+- 修复 Explore 页面生产环境白屏：移除未使用的 `shallowRef` 导入、模板内联 `.map()` 改为 computed `datasourceOptions`、全链路空值防御（`s.labels || {}`、`s.values || []`、`v.value ?? 0`、`Array.isArray` 守卫）
+
 ## [v1.16.9] - 2026-04-29
 
 ### Added
