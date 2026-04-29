@@ -10,18 +10,24 @@ const emit = defineEmits<{
   (e: 'update:value', value: number | null): void
 }>()
 
+const OFF_VALUE = -1
+
 const options = autoRefreshOptions.map(o => ({
   label: o.label,
-  value: o.value,
+  value: o.value === null ? OFF_VALUE : o.value,
 }))
+
+function handleChange(val: number) {
+  emit('update:value', val === OFF_VALUE ? null : val)
+}
 </script>
 
 <template>
   <NSelect
-    :value="value"
+    :value="value === null ? OFF_VALUE : value"
     :options="options"
     size="small"
     style="width: 80px"
-    @update:value="(v: number | null) => emit('update:value', v)"
+    @update:value="handleChange"
   />
 </template>

@@ -31,6 +31,8 @@ const view = shallowRef<EditorView>()
 const promQLExt = new PromQLExtension()
 
 function createExtensions() {
+  // Enable basic PromQL completion (keyword + function completion)
+  promQLExt.activateCompletion(true)
   const exts = [
     history(),
     keymap.of([
@@ -40,11 +42,7 @@ function createExtensions() {
       { key: 'Ctrl-Enter', run: () => { emit('execute'); return true } },
       { key: 'Cmd-Enter', run: () => { emit('execute'); return true } },
     ]),
-    promQLExt.asExtension(
-      props.datasourceId
-        ? { completeStrategy: { remote: { url: '/api/v1', datasourceId: props.datasourceId } } }
-        : {}
-    ),
+    promQLExt.asExtension(),
     autocompletion(),
     cmPlaceholder(props.placeholder),
     EditorView.updateListener.of((update) => {

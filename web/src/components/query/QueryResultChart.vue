@@ -152,7 +152,7 @@ const hasData = computed(() =>
   <div class="chart-container">
     <div v-if="hasData" class="chart-wrapper">
       <div class="legend-toggle">
-        <NTabs v-model:value="legendMode" type="segment" size="tiny" animated>
+        <NTabs v-model:value="legendMode" type="segment" size="small" animated>
           <NTabPane name="chart" tab="Chart" />
           <NTabPane name="table" tab="Stats" />
         </NTabs>

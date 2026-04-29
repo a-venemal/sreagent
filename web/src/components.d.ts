@@ -66,7 +66,14 @@ declare module 'vue' {
     NUpload: typeof import('naive-ui')['NUpload']
     NUploadDragger: typeof import('naive-ui')['NUploadDragger']
     PageHeader: typeof import('./components/common/PageHeader.vue')['default']
+    PromQLEditor: typeof import('./components/query/PromQLEditor.vue')['default']
+    QueryPanel: typeof import('./components/query/QueryPanel.vue')['default']
+    QueryResultChart: typeof import('./components/query/QueryResultChart.vue')['default']
+    QueryResultTable: typeof import('./components/query/QueryResultTable.vue')['default']
+    QueryRow: typeof import('./components/query/QueryRow.vue')['default']
+    RefreshPicker: typeof import('./components/time/RefreshPicker.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    TimeRangePicker: typeof import('./components/time/TimeRangePicker.vue')['default']
   }
 }
