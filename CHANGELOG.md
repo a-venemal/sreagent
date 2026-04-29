@@ -4,6 +4,11 @@
 
 ---
 
+## [v1.16.11] - 2026-04-29
+
+### Changed
+- 重写 Explore 页面：移除 ECharts/vue-echarts 依赖，消除生产环境白屏。列 render 函数只返回纯字符串（不再用 `h()` 返回 VNode 数组），所有 Naive UI 组件显式导入 + PascalCase 模板用法
+
 ## [v1.16.10] - 2026-04-29
 
 ### Fixed
