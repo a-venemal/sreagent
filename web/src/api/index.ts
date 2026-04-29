@@ -589,15 +589,6 @@ export const securitySettingsApi = {
     request.put<ApiResponse<null>>('/settings/security', data),
 }
 
-// ===== Mute Rule Preview API =====
-export const mutePreviewApi = {
-  preview: () =>
-    request.get<ApiResponse<Array<{
-      rule_id: number; rule_name: string
-      matched_count: number; matched_alerts: import('@/types').AlertEvent[]
-    }>>>('/mute-rules/preview'),
-}
-
 // ===== Alert Groups API =====
 export const alertGroupsApi = {
   list: (params?: { status?: string; severity?: string }) =>
@@ -642,12 +633,6 @@ export const inhibitionRuleApi = {
 export const scheduleICalApi = {
   exportURL: (scheduleId: number) =>
     `/api/v1/schedules/${scheduleId}/ical`,
-}
-
-// ===== Heartbeat Ping (public, no auth) =====
-export const heartbeatApi = {
-  ping: (token: string) =>
-    request.post<ApiResponse<{ status: string }>>(`/heartbeat/${token}`),
 }
 
 // ===== Label Registry API =====

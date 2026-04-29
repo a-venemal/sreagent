@@ -27,8 +27,8 @@ import {
   TimeOutline,
   ChevronBackOutline,
   ChevronForwardOutline,
-  DocumentTextOutline,
   SearchOutline,
+  GitNetworkOutline,
 } from '@vicons/ionicons5'
 
 const router = useRouter()
@@ -131,6 +131,7 @@ const menuOptions = computed<MenuOption[]>(() => {
     },
     { label: t('menu.notification'), key: '/notification', icon: renderIcon(NotificationsOutline) },
     { label: t('menu.schedule'), key: '/schedule',  icon: renderIcon(CalendarOutline) },
+    { label: t('menu.pipelines'), key: '/pipelines', icon: renderIcon(GitNetworkOutline) },
   ]
   // Settings page is only visible to admin and team_lead roles
   if (authStore.canManage) {
@@ -148,6 +149,8 @@ function resolveActiveKey(p: string): string {
   if (p.startsWith('/alerts/mute-rules'))         return '/alerts/mute-rules'
   if (p.startsWith('/alerts/inhibition-rules'))   return '/alerts/inhibition-rules'
   if (p.startsWith('/notification'))              return '/notification'
+  if (p.startsWith('/pipelines'))                 return '/pipelines'
+  if (p.startsWith('/schedule'))                  return '/schedule'
   return p
 }
 
@@ -221,6 +224,7 @@ const pageTitle = computed(() => {
   if (p.startsWith('/alerts/inhibition-rules'))   return t('menu.inhibitionRules')
   if (p.startsWith('/notification'))              return t('menu.notification')
   if (p === '/schedule')                          return t('menu.schedule')
+  if (p.startsWith('/pipelines'))                 return t('menu.pipelines')
   if (p === '/settings')                          return t('menu.settings')
   return ''
 })

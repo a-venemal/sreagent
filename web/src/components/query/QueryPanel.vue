@@ -56,7 +56,7 @@ const emit = defineEmits<{
 
 <style scoped>
 .query-panel {
-  background: #fff;
+  background: var(--sre-bg-card);
   border-radius: 12px;
   padding: 16px;
 }

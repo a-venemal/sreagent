@@ -13,7 +13,3 @@ type BaseModel struct {
 	UpdatedAt time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
 	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
 }
-
-// Labels represents a map of key-value label pairs.
-// Stored as JSON in the database.
-type Labels map[string]string

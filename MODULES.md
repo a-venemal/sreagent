@@ -1,6 +1,6 @@
 # 模块清单 (MODULES)
 
-> 最后更新: 2026-04-29 | tag: v1.16.2
+> 最后更新: 2026-04-29 | tag: v1.16.3
 > 共 24 个 model, 31 个 handler, 30 个 service, 23 个 repository, 126+ API 端点
 
 ---
@@ -66,7 +66,7 @@ dashboard ──→ alert-event (统计数据)
 - **后端文件**: `internal/engine/` (6 files), `internal/service/alert_group.go`
 - **API**: `GET /engine/status`
 - **状态**: ✅ 核心完成（含 heartbeat、inhibition、group_wait/interval）
-- **文档**: [docs/alert-engine.md](docs/alert-engine.md)
+- **文档**: [docs/architecture.md](docs/architecture.md)（引擎状态机 + 通知管道）
 
 ## 可编程告警处理链 (event-pipeline)
 
@@ -109,7 +109,7 @@ dashboard ──→ alert-event (统计数据)
 - **前端**: `web/src/pages/notification/` (Rules, Media, Templates, Subscribe)
 - **API**: `/api/v1/notify-rules`, `/api/v1/notify-media`, `/api/v1/message-templates`, `/api/v1/subscribe-rules` (~25 endpoints)
 - **状态**: ✅ 完成
-- **文档**: [docs/notification.md](docs/notification.md)
+- **文档**: [docs/architecture.md](docs/architecture.md)（引擎状态机 + 通知管道）
 
 ## 静默规则 (mute-rule)
 
@@ -256,4 +256,5 @@ dashboard ──→ alert-event (统计数据)
 | [docs/architecture.md](docs/architecture.md) | 架构设计 + ADR + 引擎状态机 + 通知管道 |
 | [docs/api.md](docs/api.md) | REST API 参考（120+ 端点） |
 | [docs/ci-deploy.md](docs/ci-deploy.md) | CI/CD 部署文档 |
+| [docs/n9e-gap-analysis.md](docs/n9e-gap-analysis.md) | n9e 功能差距分析 + 路线图 |
 | [docs/phases.md](docs/phases.md) | Phase 追踪 + QA 修复汇总 |

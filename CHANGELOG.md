@@ -4,12 +4,38 @@
 
 ---
 
+## [v1.16.3] - 2026-04-29
+
+### Added
+- 侧栏新增「处理链」菜单项，Pipeline 页面入口
+- i18n：menu.pipelines、explore.toggleOn/Off、common.loadFailed/updateSuccess/createSuccess/confirmDelete/filters/responders 等键值
+- i18n：alert.datasourceType/datasourceRequired/selectDatasourceType 键值
+- docs/n9e-gap-analysis.md — n9e 功能差距分析 + 三阶段实施路线图
+
+### Fixed
+- 修复 QueryRow/QueryPanel/Explore 页硬编码颜色 → CSS 自定义属性
+- 修复 A/H 切换按钮未国际化
+- 修复 resolveActiveKey/pageTitle 缺失 pipelines/schedule 路由匹配
+- 修复 Inhibition 页面使用不存在的 i18n 键（显示原始 key 字符串）
+- 修复 Alert Rules 页面缺少 i18n 的 datasourceType 相关键
+- 修复路由守卫 role 检查优先使用 Pinia Store 而非 localStorage
+- 修复迁移 000006 down.sql 错误删除未创建的索引
+- 修复 MODULES.md 指向不存在的 docs/alert-engine.md 和 docs/notification.md
+
+### Removed
+- 移除未使用的 mutePreviewApi、heartbeatApi 前端 API 定义
+- 移除未使用的 DocumentTextOutline/GridOutline 导入
+- 移除未使用的 type Labels (model/base.go)
+- 移除未使用的 useScrollReveal.ts、usePromQLCompletion.ts composables
+- 移除未使用的 magnetic 指令 + 注册
+- 移除未引用的 datasources/Query.vue 页面（路由已重定向到 /explore）
+
 ## [v1.16.2] - 2026-04-29
 
 ### Changed
 - 简化 Explore 页面布局：数据源选择器移至顶栏，移除 QueryRow 内重复选择器
 - 数据源切换自动同步到所有查询目标
-- 完善 i18n 国际化（Query 标签、日志表格列名、所有按钮和提示文本）
+- 完善 i18n 国际化
 
 ## [v1.16.1] - 2026-04-29
 

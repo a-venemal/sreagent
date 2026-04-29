@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -164,10 +165,11 @@ router.beforeEach((to, _from, next) => {
   } else if (to.name === 'Login' && token) {
     next({ name: 'Dashboard' })
   } else if (to.meta.requiresRole) {
-    // Route-level role guard
-    const userStr = localStorage.getItem('user_role')
+    // Route-level role guard: prefer store, fall back to localStorage (pre-hydration)
+    const authStore = useAuthStore()
+    const role = authStore.user?.role || localStorage.getItem('user_role')
     const allowedRoles = to.meta.requiresRole as string[]
-    if (userStr && !allowedRoles.includes(userStr)) {
+    if (role && !allowedRoles.includes(role)) {
       next({ name: 'Dashboard' })
     } else {
       next()

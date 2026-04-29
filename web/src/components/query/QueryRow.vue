@@ -39,7 +39,7 @@ function onLegendUpdate(id: string, value: string) {
           :type="target.enabled ? 'primary' : 'default'"
           @click="emit('toggle', target.id)"
         >
-          {{ target.enabled ? 'A' : 'H' }}
+          {{ target.enabled ? t('explore.toggleOn') : t('explore.toggleOff') }}
         </NButton>
         <NButton
           v-if="canRemove"
@@ -81,11 +81,11 @@ function onLegendUpdate(id: string, value: string) {
 
 <style scoped>
 .query-row {
-  border: 1px solid #e8e8e8;
+  border: 1px solid var(--sre-border);
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 8px;
-  background: #fafafa;
+  background: var(--sre-bg-sunken);
   transition: opacity 0.2s;
 }
 .query-row.disabled {
@@ -100,7 +100,7 @@ function onLegendUpdate(id: string, value: string) {
 .query-label {
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: var(--sre-text-secondary);
   text-transform: uppercase;
 }
 .query-row-body {
@@ -115,10 +115,10 @@ function onLegendUpdate(id: string, value: string) {
 .query-error {
   margin-top: 8px;
   padding: 8px;
-  background: #fff2f0;
-  border: 1px solid #ffccc7;
+  background: var(--sre-danger-soft, rgba(207, 19, 34, 0.08));
+  border: 1px solid var(--sre-danger-ring, rgba(207, 19, 34, 0.2));
   border-radius: 4px;
-  color: #cf1322;
+  color: var(--sre-danger);
   font-size: 12px;
 }
 </style>

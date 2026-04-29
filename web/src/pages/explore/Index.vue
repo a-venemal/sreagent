@@ -326,7 +326,7 @@ onMounted(fetchDatasources)
 }
 .page-subtitle {
   font-size: 13px;
-  color: #666;
+  color: var(--sre-text-secondary);
 }
 .header-right {
   display: flex;
@@ -338,19 +338,19 @@ onMounted(fetchDatasources)
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  background: var(--n-card-color, #fff);
+  background: var(--sre-bg-card);
   border-radius: 8px;
-  border: 1px solid var(--n-border-color, #eee);
+  border: 1px solid var(--sre-border);
 }
 .explore-results {
   margin-top: 16px;
-  background: #fff;
+  background: var(--sre-bg-card);
   border-radius: 12px;
   padding: 16px;
 }
 .results-section {
   margin-top: 16px;
-  background: var(--n-card-color, #fff);
+  background: var(--sre-bg-card);
   border-radius: 12px;
   padding: 16px;
   min-height: 200px;
@@ -361,7 +361,7 @@ onMounted(fetchDatasources)
 }
 .results-count {
   font-size: 13px;
-  color: #666;
+  color: var(--sre-text-secondary);
 }
 .empty-state {
   display: flex;
@@ -375,7 +375,7 @@ onMounted(fetchDatasources)
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--sre-bg-overlay, rgba(0, 0, 0, 0.5));
   border-radius: 12px;
   z-index: 10;
 }
