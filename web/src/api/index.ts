@@ -87,6 +87,18 @@ export const datasourceApi = {
 
   query: (id: number, data: { expression: string; time?: number }) =>
     request.post<ApiResponse<QueryResponse>>(`/datasources/${id}/query`, data),
+
+  rangeQuery: (id: number, data: { expression: string; start: number; end: number; step: string }) =>
+    request.post<ApiResponse<QueryResponse>>(`/datasources/${id}/query-range`, data),
+
+  labelKeys: (id: number) =>
+    request.get<ApiResponse<string[]>>(`/datasources/${id}/labels/keys`),
+
+  labelValues: (id: number, key: string) =>
+    request.get<ApiResponse<string[]>>(`/datasources/${id}/labels/values`, { params: { key } }),
+
+  metricNames: (id: number, search?: string, limit = 100) =>
+    request.get<ApiResponse<string[]>>(`/datasources/${id}/metrics`, { params: { search, limit } }),
 }
 
 // ===== Alert Rule API =====
@@ -648,4 +660,22 @@ export const labelRegistryApi = {
 
   sync: () =>
     request.post<ApiResponse<{ message: string }>>('/label-registry/sync'),
+}
+
+// ===== Dashboard V2 API =====
+export const dashboardV2Api = {
+  list: (params?: { page?: number; page_size?: number; search?: string }) =>
+    request.get<ApiResponse<PageData<import('@/types/dashboard').DashboardV2>>>('/dashboards', { params }),
+
+  get: (id: number) =>
+    request.get<ApiResponse<import('@/types/dashboard').DashboardV2>>(`/dashboards/${id}`),
+
+  create: (data: Partial<import('@/types/dashboard').DashboardV2>) =>
+    request.post<ApiResponse<import('@/types/dashboard').DashboardV2>>('/dashboards', data),
+
+  update: (id: number, data: Partial<import('@/types/dashboard').DashboardV2>) =>
+    request.put<ApiResponse<import('@/types/dashboard').DashboardV2>>(`/dashboards/${id}`, data),
+
+  delete: (id: number) =>
+    request.delete<ApiResponse<null>>(`/dashboards/${id}`),
 }

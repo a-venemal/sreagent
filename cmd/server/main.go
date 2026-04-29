@@ -116,6 +116,9 @@ func main() {
 	// Audit log repository
 	auditLogRepo := repository.NewAuditLogRepository(db)
 
+	// Dashboard v2 repository
+	dashboardV2Repo := repository.NewDashboardRepository(db)
+
 	// Dispatch repositories
 	alertChannelRepo := repository.NewAlertChannelRepository(db)
 	userNotifyConfigRepo := repository.NewUserNotifyConfigRepository(db)
@@ -155,6 +158,9 @@ func main() {
 
 	// Audit log service
 	auditLogSvc := service.NewAuditLogService(auditLogRepo, zapLogger)
+
+	// Dashboard v2 service
+	dashboardV2Svc := service.NewDashboardService(dashboardV2Repo, zapLogger)
 
 	// Dispatch services
 	alertChannelSvc := service.NewAlertChannelService(alertChannelRepo, notifyMediaRepo, zapLogger)
@@ -418,6 +424,7 @@ func main() {
 		InhibitionRule:   handler.NewInhibitionRuleHandler(inhibitionRuleSvc),
 		Heartbeat:        handler.NewHeartbeatHandler(ruleSvc),
 		LabelRegistry:    handler.NewLabelRegistryHandler(labelRegistrySvc),
+		DashboardV2:      handler.NewDashboardV2Handler(dashboardV2Svc),
 	}
 
 	// Inject audit service into handlers that support it
@@ -582,6 +589,9 @@ func autoMigrate(db *gorm.DB) error {
 
 	// Label registry (autocomplete for match_labels)
 	models = append(models, &model.LabelRegistry{})
+
+	// Dashboards (v2 — panel/variable config stored in JSON)
+	models = append(models, &model.Dashboard{})
 
 	return db.AutoMigrate(models...)
 }

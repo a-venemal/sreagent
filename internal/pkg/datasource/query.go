@@ -233,3 +233,39 @@ func parseDataPoint(raw []interface{}) (DataPoint, error) {
 		Value:     val,
 	}, nil
 }
+
+// ProxyGet proxies an HTTP GET request to the target datasource endpoint.
+// Used for label/metric queries to support PromQL autocompletion.
+func (qc *QueryClient) ProxyGet(ctx context.Context, endpoint, authType, authConfig, path string, params map[string]string) ([]byte, error) {
+	apiURL := strings.TrimRight(endpoint, "/") + path
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create proxy request: %w", err)
+	}
+
+	q := req.URL.Query()
+	for k, v := range params {
+		q.Set(k, v)
+	}
+	req.URL.RawQuery = q.Encode()
+
+	applyAuth(req, authType, authConfig)
+
+	resp, err := qc.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("proxy request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read proxy response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("proxy request returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return body, nil
+}

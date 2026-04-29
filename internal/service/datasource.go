@@ -211,3 +211,51 @@ func (s *DataSourceService) QueryDatasource(ctx context.Context, dsID uint, expr
 	}
 	return resp, nil
 }
+
+// QueryRange executes a PromQL range query against the given datasource.
+func (s *DataSourceService) QueryRange(ctx context.Context, dsID uint, expression string, start, end time.Time, step string) (*QueryResponse, error) {
+	ds, err := s.repo.GetByID(ctx, dsID)
+	if err != nil {
+		return nil, apperr.ErrDSNotFound
+	}
+
+	switch ds.Type {
+	case model.DSTypePrometheus, model.DSTypeVictoriaMetrics:
+		// proceed
+	default:
+		return nil, apperr.WithMessage(apperr.ErrInvalidParam, "range query not supported for "+string(ds.Type))
+	}
+
+	qc := datasource.NewQueryClient()
+	results, err := qc.RangeQuery(ctx, ds.Endpoint, ds.AuthType, ds.AuthConfig, expression, start, end, step)
+	if err != nil {
+		return nil, apperr.WithMessage(apperr.ErrExternalAPI, err.Error())
+	}
+
+	resp := &QueryResponse{ResultType: "matrix"}
+	for _, r := range results {
+		item := QuerySeriesItem{Labels: r.Labels}
+		for _, v := range r.Values {
+			item.Values = append(item.Values, QueryDataPoint{Timestamp: v.Timestamp.UnixMilli(), Value: v.Value})
+		}
+		resp.Series = append(resp.Series, item)
+	}
+
+	// Limit series count
+	if len(resp.Series) > 1000 {
+		resp.Series = resp.Series[:1000]
+	}
+	return resp, nil
+}
+
+// ProxyToDatasource proxies an HTTP GET request to the target datasource's API.
+// Used for label/metric queries to support PromQL autocompletion.
+func (s *DataSourceService) ProxyToDatasource(ctx context.Context, dsID uint, path string, params map[string]string) ([]byte, error) {
+	ds, err := s.repo.GetByID(ctx, dsID)
+	if err != nil {
+		return nil, apperr.ErrDSNotFound
+	}
+
+	qc := datasource.NewQueryClient()
+	return qc.ProxyGet(ctx, ds.Endpoint, ds.AuthType, ds.AuthConfig, path, params)
+}

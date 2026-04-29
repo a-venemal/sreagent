@@ -32,8 +32,20 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'datasources/query',
         name: 'DatasourceQuery',
-        component: () => import('@/pages/datasources/Query.vue'),
+        component: () => import('@/pages/explore/Index.vue'),
         meta: { title: 'Query', icon: 'search' },
+      },
+      {
+        path: 'dashboards-v2',
+        name: 'DashboardV2List',
+        component: () => import('@/pages/dashboard-v2/Index.vue'),
+        meta: { title: 'Dashboards V2', icon: 'dashboard' },
+      },
+      {
+        path: 'dashboards-v2/:id',
+        name: 'DashboardV2View',
+        component: () => import('@/pages/dashboard-v2/View.vue'),
+        meta: { title: 'Dashboard', icon: 'dashboard' },
       },
       {
         path: 'alerts',

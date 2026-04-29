@@ -251,6 +251,37 @@ Authorization: Bearer <token>
 | PUT | `/datasources/:id` | 仅管理员 | 更新 |
 | DELETE | `/datasources/:id` | 仅管理员 | 删除 |
 | POST | `/datasources/:id/health-check` | 管理权限 | 触发健康检查 |
+| POST | `/datasources/:id/query` | 管理权限 | Instant Query 测试 |
+| POST | `/datasources/:id/query-range` | 管理权限 | Range Query（时间序列查询） |
+| GET | `/datasources/:id/labels/keys` | 已认证 | 获取 label name 列表（自动补全） |
+| GET | `/datasources/:id/labels/values?key=job` | 已认证 | 获取 label value 列表 |
+| GET | `/datasources/:id/metrics?search=&limit=` | 已认证 | 获取 metric 名称列表 |
+
+**Range Query 请求体：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `expression` | string | 是 | PromQL 表达式 |
+| `start` | number | 是 | 起始时间（Unix 秒） |
+| `end` | number | 是 | 结束时间（Unix 秒） |
+| `step` | string | 是 | 步长（如 `15s`、`1m`、`5m`） |
+
+**Range Query 响应：**
+
+```json
+{
+  "code": 0,
+  "data": {
+    "result_type": "matrix",
+    "series": [
+      {
+        "labels": {"__name__": "http_requests_total", "job": "api-server"},
+        "values": [{"ts": 1714300800000, "value": 123.45}]
+      }
+    ]
+  }
+}
+```
 
 **创建 / 更新请求体：**
 
@@ -1060,6 +1091,26 @@ AI 驱动的告警分析。支持 LLM 生成的告警报告和 SOP 建议。
   }
 }
 ```
+
+### Dashboard V2（面板仪表盘）
+
+| 方法 | 路由 | 访问级别 | 说明 |
+|------|------|----------|------|
+| GET | `/dashboards` | 已认证 | 列表（分页）。筛选：`?search=xxx` |
+| GET | `/dashboards/:id` | 已认证 | 按 ID 获取 |
+| POST | `/dashboards` | 管理权限 | 创建 |
+| PUT | `/dashboards/:id` | 管理权限 | 更新 |
+| DELETE | `/dashboards/:id` | 管理权限 | 删除 |
+
+**创建 / 更新请求体：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | 是 | 仪表盘名称 |
+| `description` | string | 否 | 描述 |
+| `tags` | map[string]string | 否 | 标签 |
+| `config` | string (JSON) | 否 | 面板布局和变量配置 |
+| `is_public` | bool | 否 | 是否公开 |
 
 ---
 

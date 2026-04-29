@@ -45,6 +45,7 @@ type Handlers struct {
 	InhibitionRule   *handler.InhibitionRuleHandler
 	Heartbeat        *handler.HeartbeatHandler
 	LabelRegistry    *handler.LabelRegistryHandler
+	DashboardV2      *handler.DashboardV2Handler
 }
 
 // Setup initializes the Gin router with all routes and middleware.
@@ -132,6 +133,10 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 				ds.DELETE("/:id", adminOnly, handlers.DataSource.Delete)
 				ds.POST("/:id/health-check", manage, handlers.DataSource.HealthCheck)
 				ds.POST("/:id/query", manage, handlers.DataSource.Query)
+				ds.POST("/:id/query-range", manage, handlers.DataSource.RangeQuery)
+				ds.GET("/:id/labels/keys", handlers.DataSource.LabelKeys)
+				ds.GET("/:id/labels/values", handlers.DataSource.LabelValues)
+				ds.GET("/:id/metrics", handlers.DataSource.MetricNames)
 			}
 
 			// Alert Rules
@@ -418,6 +423,16 @@ func Setup(cfg *config.Config, handlers *Handlers, logger *zap.Logger) *gin.Engi
 			auth.GET("/dashboard/top-rules", handlers.Dashboard.GetTopRules)
 			auth.GET("/dashboard/severity-history", handlers.Dashboard.GetSeverityHistory)
 			auth.GET("/dashboard/export", handlers.Dashboard.ExportReport)
+
+				// Dashboard v2 (panel/variable dashboards)
+				dashV2 := auth.Group("/dashboards")
+				{
+					dashV2.GET("", handlers.DashboardV2.List)
+					dashV2.GET("/:id", handlers.DashboardV2.Get)
+					dashV2.POST("", manage, handlers.DashboardV2.Create)
+					dashV2.PUT("/:id", manage, handlers.DashboardV2.Update)
+					dashV2.DELETE("/:id", manage, handlers.DashboardV2.Delete)
+				}
 		}
 	}
 

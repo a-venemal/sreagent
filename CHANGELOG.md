@@ -4,6 +4,24 @@
 
 ---
 
+## [v1.14.0] - 2026-04-29
+
+### Added
+- 数据源探索页面（Explore）：PromQL 编辑器（CodeMirror 6 + 语法高亮 + 自动补全）
+- Range Query 支持：POST /api/v1/datasources/:id/query-range
+- 数据源标签代理端点：GET /api/v1/datasources/:id/labels/keys、labels/values、metrics
+- ECharts 时间序列图表（dataZoom、tooltip cross 指针、Legend 统计表格）
+- 时间范围选择器（相对/绝对时间）+ 自动刷新
+- 多查询支持、Legend 格式化、Chart/Table 视图切换
+- 仪表盘 V2 系统：Dashboard CRUD 端点（/api/v1/dashboards）
+- 变量模板系统：query/custom/textbox/constant 类型，$var 替换
+- 仪表盘列表页和查看页（全局时间范围、变量选择器）
+- 值格式化工具（bytes/seconds/percent/short/scientific）
+- 迁移: 000016_dashboards
+
+### Changed
+- /datasources/query 路由指向新的 Explore 页面（替代原生 HTML 查询页）
+
 ## [v1.11.0] - 2026-04-27
 
 ### Added

@@ -1,6 +1,6 @@
 # 模块清单 (MODULES)
 
-> 最后更新: 2026-04-27 | tag: v1.13.4
+> 最后更新: 2026-04-29 | tag: v1.14.0
 > 共 22 个 model, 30 个 handler, 29 个 service, 21 个 repository, 120+ API 端点
 
 ---
@@ -123,11 +123,21 @@ dashboard ──→ alert-event (统计数据)
 
 ## 数据源 (datasource)
 
-- **功能**: Prom/VM/VLogs/Zabbix 多源管理、健康检查、PromQL 查询
+- **功能**: Prom/VM/VLogs/Zabbix 多源管理、健康检查、Instant/Range Query、标签代理
 - **后端**: `model/datasource.go`, `handler/datasource.go`, `service/datasource.go`, `repository/datasource.go`, `pkg/datasource/` (8 files)
-- **前端**: `web/src/pages/datasources/Index.vue`
-- **API**: `/api/v1/datasources` (7 endpoints)
+- **前端**: `web/src/pages/datasources/Index.vue`, `web/src/pages/explore/Index.vue`
+- **API**: `/api/v1/datasources` (11 endpoints: CRUD + health-check + query + query-range + labels/keys + labels/values + metrics)
 - **状态**: ✅ 完成
+
+## 仪表盘 V2 (dashboard-v2)
+
+- **功能**: 面板仪表盘、变量模板系统、PromQL 查询 + ECharts 时序图
+- **后端**: `model/dashboard.go`, `handler/dashboard_v2.go`, `service/dashboard.go`, `repository/dashboard.go`
+- **前端**: `web/src/pages/dashboard-v2/Index.vue`, `web/src/pages/dashboard-v2/View.vue`, `web/src/components/query/`, `web/src/components/time/`
+- **API**: `/api/v1/dashboards` (5 endpoints: CRUD)
+- **依赖**: datasource (查询数据)
+- **状态**: ✅ 完成
+- **迁移**: 000016_dashboards
 
 ## 值班排班 (schedule)
 

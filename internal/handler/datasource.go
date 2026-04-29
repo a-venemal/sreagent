@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -188,4 +189,132 @@ func (h *DataSourceHandler) Query(c *gin.Context) {
 		return
 	}
 	Success(c, result)
+}
+
+// RangeQuery executes a PromQL range query against a datasource.
+// POST /api/v1/datasources/:id/query-range
+func (h *DataSourceHandler) RangeQuery(c *gin.Context) {
+	id, err := GetIDParam(c, "id")
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	var req struct {
+		Expression string  `json:"expression" binding:"required"`
+		Start      float64 `json:"start" binding:"required"` // unix timestamp in seconds
+		End        float64 `json:"end" binding:"required"`   // unix timestamp in seconds
+		Step       string  `json:"step" binding:"required"`  // e.g. "15s", "1m", "5m"
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorWithMessage(c, 10001, err.Error())
+		return
+	}
+
+	start := time.Unix(int64(req.Start), 0)
+	end := time.Unix(int64(req.End), 0)
+
+	result, err := h.svc.QueryRange(c.Request.Context(), id, req.Expression, start, end, req.Step)
+	if err != nil {
+		Error(c, err)
+		return
+	}
+	Success(c, result)
+}
+
+// LabelKeys returns label names from the target datasource (for PromQL autocompletion).
+// GET /api/v1/datasources/:id/labels/keys
+func (h *DataSourceHandler) LabelKeys(c *gin.Context) {
+	id, err := GetIDParam(c, "id")
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	body, err := h.svc.ProxyToDatasource(c.Request.Context(), id, "/api/v1/labels", nil)
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	var apiResp struct {
+		Status string   `json:"status"`
+		Data   []string `json:"data"`
+	}
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		ErrorWithMessage(c, 50003, "failed to parse label keys response")
+		return
+	}
+
+	Success(c, apiResp.Data)
+}
+
+// LabelValues returns values for a given label key from the target datasource.
+// GET /api/v1/datasources/:id/labels/values?key=job
+func (h *DataSourceHandler) LabelValues(c *gin.Context) {
+	id, err := GetIDParam(c, "id")
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	key := c.Query("key")
+	if key == "" {
+		ErrorWithMessage(c, 10001, "key parameter is required")
+		return
+	}
+
+	body, err := h.svc.ProxyToDatasource(c.Request.Context(), id, "/api/v1/label/"+key+"/values", nil)
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	var apiResp struct {
+		Status string   `json:"status"`
+		Data   []string `json:"data"`
+	}
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		ErrorWithMessage(c, 50003, "failed to parse label values response")
+		return
+	}
+
+	Success(c, apiResp.Data)
+}
+
+// MetricNames returns metric names from the target datasource (for PromQL autocompletion).
+// GET /api/v1/datasources/:id/metrics?search=http&limit=100
+func (h *DataSourceHandler) MetricNames(c *gin.Context) {
+	id, err := GetIDParam(c, "id")
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	params := map[string]string{
+		"label_name": "__name__",
+	}
+	if search := c.Query("search"); search != "" {
+		params["search"] = search
+	}
+	if limit := c.Query("limit"); limit != "" {
+		params["limit"] = limit
+	}
+
+	body, err := h.svc.ProxyToDatasource(c.Request.Context(), id, "/api/v1/label/__name__/values", params)
+	if err != nil {
+		Error(c, err)
+		return
+	}
+
+	var apiResp struct {
+		Status string   `json:"status"`
+		Data   []string `json:"data"`
+	}
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		ErrorWithMessage(c, 50003, "failed to parse metric names response")
+		return
+	}
+
+	Success(c, apiResp.Data)
 }
