@@ -152,7 +152,7 @@ async function executeQuery() {
         limit: logLimit.value,
       })
       const data = res.data.data
-      logEntries.value = data.entries || []
+      logEntries.value = (data.entries || []).map((e: any, i: number) => ({ ...e, _key: i }))
       logTotal.value = data.total || 0
       logTruncated.value = data.truncated || false
     } else {
@@ -313,7 +313,7 @@ onMounted(fetchDatasources)
         :columns="metricsColumns"
         :data="tableData"
         :max-height="600"
-        :row-key="(_row: any, index: number) => index"
+        :row-key="(row: any) => (row as any)._key"
         size="small"
         striped
       />
@@ -335,7 +335,7 @@ onMounted(fetchDatasources)
         :columns="logColumns"
         :data="logEntries"
         :max-height="600"
-        :row-key="(_row: any, index: number) => index"
+        :row-key="(row: any) => (row as any)._key"
         :scrollbar-props="{ trigger: 'hover' }"
         size="small"
         striped
