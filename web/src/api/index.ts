@@ -668,27 +668,3 @@ export const dashboardV2Api = {
   delete: (id: number) =>
     request.delete<ApiResponse<null>>(`/dashboards/${id}`),
 }
-
-// ===== Event Pipeline API =====
-export const pipelineApi = {
-  list: (params?: { page?: number; page_size?: number; search?: string }) =>
-    request.get<ApiResponse<PageData<import('@/types/pipeline').EventPipeline>>>('/event-pipelines', { params }),
-
-  get: (id: number) =>
-    request.get<ApiResponse<import('@/types/pipeline').EventPipeline>>(`/event-pipelines/${id}`),
-
-  create: (data: Partial<import('@/types/pipeline').EventPipeline>) =>
-    request.post<ApiResponse<import('@/types/pipeline').EventPipeline>>('/event-pipelines', data),
-
-  update: (id: number, data: Partial<import('@/types/pipeline').EventPipeline>) =>
-    request.put<ApiResponse<import('@/types/pipeline').EventPipeline>>(`/event-pipelines/${id}`, data),
-
-  delete: (id: number) =>
-    request.delete<ApiResponse<null>>(`/event-pipelines/${id}`),
-
-  tryRun: (data: { pipeline_id: number; event: any }) =>
-    request.post<ApiResponse<any>>('/event-pipelines/tryrun', data),
-
-  listExecutions: (id: number, params?: { page?: number; page_size?: number }) =>
-    request.get<ApiResponse<PageData<import('@/types/pipeline').PipelineExecution>>>(`/event-pipelines/${id}/executions`, { params }),
-}

@@ -4,6 +4,19 @@
 
 ---
 
+## [v1.16.7] - 2026-04-29
+
+### Removed
+- 移除可编程告警处理链 (Event Pipeline) 功能：前端页面/路由/菜单/i18n、后端 handler/service/repository/model/engine 全部删除
+- 从 onAlertFn 移除 Pipeline 拦截点，简化告警处理流程为: inhibition → mute → bizgroup → group → notify
+
+### Fixed
+- 恢复 6 个被误删的 i18n key（addQuery/runQueries/queryLabel/toggleOn/toggleOff/legendFormat），修复 Dashboard V2 查询组件显示原始 key 字符串
+- Dashboard V2 列表页完整国际化 + 操作按钮（查看/编辑/删除）
+- 补全英文 i18n 缺失的 dashboardV2 段
+- Dashboard V2 面板网格渲染：CSS Grid 布局 + PanelCard 组件（支持 timeseries/stat/table 三种面板）
+- Dashboard V2 硬编码颜色全部替换为 CSS 自定义属性，适配暗色模式
+
 ## [v1.16.4] - 2026-04-29
 
 ### Security
