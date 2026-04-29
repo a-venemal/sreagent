@@ -30,17 +30,14 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Data Sources', icon: 'server' },
       },
       {
-        path: 'datasources/query',
-        name: 'DatasourceQuery',
+        path: 'explore',
+        name: 'Explore',
         component: () => import('@/pages/explore/Index.vue'),
-        meta: { title: 'Query', icon: 'search' },
+        meta: { title: 'Explore', icon: 'search' },
       },
-      {
-        path: 'explore/logs',
-        name: 'LogExplorer',
-        component: () => import('@/pages/explore/LogExplorer.vue'),
-        meta: { title: 'Log Explorer', icon: 'document-text' },
-      },
+      // Backward-compatible redirects
+      { path: 'datasources/query', redirect: '/explore' },
+      { path: 'explore/logs', redirect: '/explore' },
       {
         path: 'dashboards-v2',
         name: 'DashboardV2List',

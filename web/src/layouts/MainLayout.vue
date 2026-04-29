@@ -28,6 +28,7 @@ import {
   ChevronBackOutline,
   ChevronForwardOutline,
   DocumentTextOutline,
+  SearchOutline,
 } from '@vicons/ionicons5'
 
 const router = useRouter()
@@ -111,12 +112,11 @@ function renderIcon(icon: any) {
 const menuOptions = computed<MenuOption[]>(() => {
   const items: MenuOption[] = [
     { label: t('menu.dashboard'),        key: '/dashboard',  icon: renderIcon(GridOutline) },
+    { label: t('menu.explore') || 'Explore', key: '/explore', icon: renderIcon(SearchOutline) },
     {
       label: t('menu.datasources'), key: '/datasources', icon: renderIcon(ServerOutline),
       children: [
         { label: t('menu.datasourceList'), key: '/datasources' },
-        { label: t('menu.datasourceQuery'), key: '/datasources/query' },
-        { label: t('menu.logExplorer') || 'Log Explorer', key: '/explore/logs', icon: renderIcon(DocumentTextOutline) },
       ],
     },
     {
@@ -140,8 +140,7 @@ const menuOptions = computed<MenuOption[]>(() => {
 })
 
 function resolveActiveKey(p: string): string {
-  if (p.startsWith('/datasources/query'))         return '/datasources/query'
-  if (p.startsWith('/explore/logs'))              return '/explore/logs'
+  if (p.startsWith('/explore'))                   return '/explore'
   if (p.startsWith('/datasources'))               return '/datasources'
   if (p.startsWith('/alerts/rules'))              return '/alerts/rules'
   if (p.startsWith('/alerts/events'))             return '/alerts/events'
@@ -214,8 +213,7 @@ const pageTitle = computed(() => {
   const p = route.path
   if (p === '/dashboard')                         return t('menu.dashboard')
   if (p === '/datasources')                       return t('menu.datasources')
-  if (p.startsWith('/datasources/query'))         return t('menu.datasourceQuery')
-  if (p.startsWith('/explore/logs'))              return t('menu.logExplorer') || 'Log Explorer'
+  if (p.startsWith('/explore'))                   return t('menu.explore') || 'Explore'
   if (p.startsWith('/alerts/rules'))              return t('menu.alertRules')
   if (p.startsWith('/alerts/events'))             return t('menu.activeAlerts')
   if (p.startsWith('/alerts/history'))            return t('menu.alertHistory')

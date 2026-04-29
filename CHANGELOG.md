@@ -7,14 +7,20 @@
 ## [v1.16.0] - 2026-04-29
 
 ### Added
-- 日志探索页面（Log Explorer）：LogsQL 查询、日志表格展示、时间范围选择
+- 统一数据探索页面（Explore）：根据数据源类型自动切换指标/日志查询模式
+- Prometheus/VM 数据源 → PromQL 编辑器 + 时序图表/表格
+- VictoriaLogs 数据源 → LogsQL 查询 + 日志条目表格
+- 侧栏新增顶级「探索」菜单入口
+- 旧路由 `/datasources/query` 和 `/explore/logs` 自动重定向到 `/explore`
 - VictoriaLogs 日志查询端点：`POST /api/v1/datasources/:id/log-query`
-- 侧栏菜单新增「日志探索」入口（数据源子菜单下）
-- 中英文 i18n 支持
+- 中英文 i18n 支持（所有错误提示和 UI 文本）
 
 ### Fixed
 - 修复数据查询页白屏：`crypto.randomUUID` 在 HTTP 非安全上下文下不可用，改用 fallback UUID 生成
 - 修复登录页 401 错误显示英文：拦截器现在优先使用后端返回的业务错误码进行本地化（如 10102 → "用户名或密码错误"）
+
+### Removed
+- 删除独立的 LogExplorer.vue（合并到统一 Explore 页面）
 
 ## [v1.15.0] - 2026-04-29
 
