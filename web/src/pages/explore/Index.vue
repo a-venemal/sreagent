@@ -168,10 +168,11 @@ const metricsColumns: DataTableColumns<{ labels: Record<string, string>; value: 
 ]
 
 const tableData = computed(() => {
-  const rows: { labels: Record<string, string>; value: number }[] = []
+  const rows: { labels: Record<string, string>; value: number; _key: number }[] = []
+  let idx = 0
   for (const s of series.value) {
     for (const v of s.values) {
-      rows.push({ labels: s.labels, value: v.value })
+      rows.push({ labels: s.labels, value: v.value, _key: idx++ })
     }
   }
   return rows
@@ -389,7 +390,7 @@ onMounted(fetchDatasources)
               :columns="metricsColumns"
               :data="tableData"
               :max-height="400"
-              :row-key="(row: any, idx: number) => idx"
+              :row-key="(row: any) => row._key"
               size="small"
               striped
             />
