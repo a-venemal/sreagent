@@ -4,6 +4,12 @@
 
 ---
 
+## [v1.16.16] - 2026-04-30
+
+### Fixed
+- **DataView Symbol.toStringTag 报错**：lodash（Naive UI 内置）`getRawTag()` 在 ES module strict mode 下尝试覆写只读的 `DataView.prototype[Symbol.toStringTag]`，导致 "Cannot assign to read only property" TypeError
+- 新增 `dataview-polyfill.ts`，在 main.ts 最开始执行，将 DataView 的 Symbol.toStringTag 属性设为 writable
+
 ## [v1.16.15] - 2026-04-30
 
 ### Fixed
