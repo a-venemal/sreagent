@@ -4,6 +4,15 @@
 
 ---
 
+## [v1.16.12] - 2026-04-30
+
+### Fixed
+- Explore 页面 `row-key` 类型错误 — 单参数函数匹配 `CreateRowKey<any>` 签名
+- Explore 页面日志数据添加 `_key` 索引
+
+### Debug
+- Explore 页面添加 `onErrorCaptured` 错误边界 + console 诊断日志，定位生产白屏根因
+
 ## [v1.16.11] - 2026-04-29
 
 ### Changed
