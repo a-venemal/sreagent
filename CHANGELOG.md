@@ -4,6 +4,16 @@
 
 ---
 
+## [v1.16.19] - 2026-04-30
+
+### Changed
+- **Explore 页面 UI 重写**：使用 Naive UI 组件替代纯 HTML 元素
+  - PromQLEditor（CodeMirror 6 + PromQL 语法高亮）用于指标数据源
+  - 日志数据源使用简洁的 textarea + 等宽字体
+  - ECharts 时序图表 + DataTable 表格切换
+  - 数据源选择器显示类型标签（Prometheus/VM/VLogs/Zabbix）和版本号
+  - 自动根据数据源类型切换查询模式（指标/日志）
+
 ## [v1.16.18] - 2026-04-30
 
 ### Fixed
