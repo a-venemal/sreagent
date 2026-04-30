@@ -11,7 +11,15 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
   build: {
-    minify: 'esbuild',
+    minify: 'terser',
+    terserOptions: {
+      mangle: {
+        safari10: true,
+      },
+      format: {
+        comments: false,
+      },
+    },
   },
   plugins: [
     vue(),

@@ -4,6 +4,15 @@
 
 ---
 
+## [v1.16.17] - 2026-04-30
+
+### Fixed
+- **vue-i18n message-compiler tokenizer 报错**：esbuild 压缩仍然损坏 `@intlify/message-compiler`，之前是 `Unterminated closing brace`（v1.16.15 修复），v1.16.16 又出现 `INVALID_TOKEN_IN_PLACEHOLDER` (code 2)，本质是 esbuild 对编译器状态机代码的持续损坏
+- 切换回 terser 压缩器，配合 DataView polyfill（v1.16.16）绕过 ES module read-only 问题
+
+### Changed
+- `vite.config.ts`: `minify: 'esbuild'` → `minify: 'terser'`
+
 ## [v1.16.16] - 2026-04-30
 
 ### Fixed
